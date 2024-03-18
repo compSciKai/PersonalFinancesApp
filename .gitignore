@@ -1,0 +1,10 @@
+*\obj
+bin
+*.suo
+*.user
+*.sln.docstates
+
+[Db]debug/
+[Rr]elease/
+*.obj
+*.pdb
