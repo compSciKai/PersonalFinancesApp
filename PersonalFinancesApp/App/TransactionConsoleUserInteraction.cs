@@ -1,4 +1,6 @@
-﻿namespace PersonalFinances.App;
+﻿using PersonalFinances.Models;
+
+namespace PersonalFinances.App;
 
 public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 {
@@ -21,5 +23,13 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     {
         Console.WriteLine("Press any key to exit.");
         Console.ReadKey();
+    }
+
+    public void OutputTransactions(IEnumerable<Transaction> transactions)
+    {
+        foreach (Transaction transaction in transactions)
+        {
+            Console.WriteLine($"{transaction.Date}: {transaction.Description} - {transaction.Amount}");
+        }
     }
 }

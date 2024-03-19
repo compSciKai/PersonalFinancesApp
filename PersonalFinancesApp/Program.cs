@@ -4,7 +4,8 @@ using PersonalFinances.App;
 // Initialize appliction
 var FinancialApp = new PersonalFinancesApp(
     new CsvTransactionRepository(),
-    new TransactionsConsoleUserInteraction()
+    new TransactionsConsoleUserInteraction(),
+    new VendorsService(new VendorsRepository())
 );
 
 // TODO: add path to existing transactions

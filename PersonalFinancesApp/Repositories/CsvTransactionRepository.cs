@@ -15,17 +15,18 @@ public class CsvTransactionRepository : ITransactionsRepository
         // {
 
         // }
-        using (var reader = new StreamReader(filePath))
-        using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
-            var records = csv.GetRecords<Transaction>();
-            foreach (var record in records) 
-            {
-                Console.WriteLine($"{record.Date}: {record.Description} - {record.Amount}");
-            }
+            HeaderValidated = null,
+            MissingFieldFound = null
+        };
+
+        using (var reader = new StreamReader(filePath))
+        using (var csv = new CsvReader(reader, config))
+        {
+            var transactionEnumerable = csv.GetRecords<Transaction>();
+            
+            return transactionEnumerable.ToList();
         }
-
-        return new List<Transaction>();
-
     }
 }
