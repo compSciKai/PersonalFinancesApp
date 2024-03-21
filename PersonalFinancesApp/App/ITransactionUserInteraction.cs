@@ -5,6 +5,7 @@ public interface ITransactionsUserInteraction
 {
     void ShowMessage(string message);
     void Exit();
-    string GetPath();
+    string GetInput();
     void OutputTransactions(IEnumerable<Transaction> transactions);
+    string PromptForVendorValue(string transactionData);
 }

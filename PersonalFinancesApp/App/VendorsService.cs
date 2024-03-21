@@ -3,24 +3,47 @@ namespace PersonalFinances.App;
 
 public class VendorsService : IVendorsService
 {
-    Dictionary<string, string> _vendorsMap;
+    Dictionary<string, string>? VendorsMap {get; set;}
     IVendorsRepository _vendorsRepository;
 
-    VendorsService(IVendorsRepository vendorsRepository)
+    public VendorsService(IVendorsRepository vendorsRepository)
     {
         _vendorsRepository = vendorsRepository;
-
-        // load vendors repo and initialize map
-
-        // IEnumerable<string> vendorStrings = _vendorsRepository.Read();
-        // foreach (var vendorString in vendorStrings)
-        // {
-        //     // Split the string and add key value pairs
-        // }
     }
 
-    void SaveNewVendors(Dictionary<string, string> newVendorMap, string path);
-    string FindVendorFromDescription(string transactionDescription);
-    string CreateVendor(string key, string vendorName);
+    public void Init(string vendorsFilePath) 
+    {
+        VendorsMap = _vendorsRepository.LoadVendorsMap(vendorsFilePath);
+    }
+
+    public string GetVendor(string taransactionData)
+    {
+        foreach (var kvp in VendorsMap)
+        {
+            if (taransactionData.Contains(kvp.Key))
+            {
+                return kvp.Value;
+            }
+        }
+
+        return "";
+    }
+
+    public void StoreNewVendor(string path, string key, string vendorName)
+    {
+        VendorsMap.Add(key, vendorName);
+        _vendorsRepository.SaveVendorsMap(path, VendorsMap);
+    }
+
+    public void StoreNewVendors(Dictionary<string, string> newVendorsEntries)
+    {
+        foreach (var kvp in newVendorsEntries)
+        {
+            if (!newVendorsEntries.ContainsKey(kvp.Key))
+            {
+                VendorsMap[kvp.Key] = kvp.Value;
+            }
+        }
+    }
 }
 

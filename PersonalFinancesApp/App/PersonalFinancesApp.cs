@@ -1,17 +1,12 @@
 using PersonalFinances.Repositories;
 using PersonalFinances.Models;
+
 namespace PersonalFinances.App;
 class PersonalFinancesApp
 {
     private readonly ITransactionsRepository _transactionRepository;
     private readonly ITransactionsUserInteraction _transactionUserInteraction;
     private readonly IVendorsService _vendorsService;
-
-    public PersonalFinancesApp(ITransactionsRepository transactionRepository, ITransactionsUserInteraction transactionUserInteraction)
-    {
-        _transactionRepository = transactionRepository;
-        _transactionUserInteraction = transactionUserInteraction;
-    }
 
     public PersonalFinancesApp(
         ITransactionsRepository transactionRepository, 
@@ -21,42 +16,52 @@ class PersonalFinancesApp
     {
         _transactionRepository = transactionRepository;
         _transactionUserInteraction = transactionUserInteraction;
-        _vendorsService = vendorsService;
+        _vendorsService = vendorsService; 
     }
 
-    public void Run(string newTransactionsFilePath)
+    public void Run(string transactionsFilePath, string vendorsFilePath)
     {
+        _vendorsService.Init(vendorsFilePath);
         Console.WriteLine("Finances App Initialized");
 
-        List<Transaction> rawTransactions = _transactionRepository.GetTransactions(newTransactionsFilePath);
+        // TODO: Validate paths
+
+        List<Transaction> rawTransactions = _transactionRepository.GetTransactions(transactionsFilePath);
+
+        foreach (var transaction in rawTransactions)
+        {
+            if (transaction.Vendor is null)
+            {
+                string? vendor = _vendorsService.GetVendor(transaction.Description);
+                if (vendor == "")
+                {
+                    vendor = _transactionUserInteraction.PromptForVendorValue(transaction.Description);
+                }
+
+                transaction.Vendor = vendor;
+
+                // TODO: Save vendor to map
+            }
+        }
+
         _transactionUserInteraction.OutputTransactions(rawTransactions);
 
-        // TODO: add vendor to each transaction. Build up vendor list
-            /*
-                If no vendor: 
-                    use regex method to see if vendor can be found (*)
-
-                    if no vendor found from regex method:
-                        Ask user to add a vendor for the entry
-                        Save the vendor entry
-
-                Create vendorService: saves vendors and regular expressions for each
-
-                (*) Regex method:
-                    take description and split on space characters
-                    pass tokens into dictionary until key found
-                        - if no key found, ask user to manually enter vender
-            */
         // TODO: categorize
+
+        // // Categorize Transactions
+        // FinancialApp.OutputCategorized(transactions);
     }
 
 
     public void Run()
     {
-        _transactionUserInteraction.ShowMessage("Please enter a path to your latest transactions:");
-        string transactionsPath = _transactionUserInteraction.GetPath();
-
+        _transactionUserInteraction.ShowMessage("Please enter a path to your transactions:");
+        string transactionsPath = _transactionUserInteraction.GetInput();
         Console.WriteLine($"Transaction path is {transactionsPath}");
+
+        _transactionUserInteraction.ShowMessage("Please enter a path to your list of saved vendors:");
+        string vendorsPath = _transactionUserInteraction.GetInput();
+        Console.WriteLine($"Vendors path is {vendorsPath}");
 
         // TODO: complete method call this(transactionPath?)
     }

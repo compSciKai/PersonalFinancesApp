@@ -1,9 +1,11 @@
-﻿namespace PersonalFinances.App;
+﻿using PersonalFinances.Repositories;
+
+namespace PersonalFinances.App;
 
 public interface IVendorsService
 {
-    void LoadVendors(string path);
-    void SaveVendors(string path);
-    string FindVendor(string transactionDescription);
-    string CreateVendor(string key, string vendorName);
+    void Init(string VendorsFilePath);
+    string GetVendor(string transactionData);
+    void StoreNewVendor(string path, string key, string vendorName);
+    void StoreNewVendors(Dictionary<string, string> vendorsDictionary);
 }

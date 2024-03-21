@@ -13,7 +13,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         Console.WriteLine(message);
     }
 
-    public string GetPath() 
+    public string GetInput() 
     {
         string input = Console.ReadLine();
         return input;
@@ -29,7 +29,32 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     {
         foreach (Transaction transaction in transactions)
         {
-            Console.WriteLine($"{transaction.Date}: {transaction.Description} - {transaction.Amount}");
+            Console.WriteLine($"{transaction.Date}: {transaction.Vendor} - {transaction.Description} - {transaction.Amount}");
         }
+    }
+
+    public string PromptForVendorValue(string description)
+    {
+        bool invalidVendorInput = true;
+        string input = "";
+        ShowMessage(
+        $"Vendor could not be found for this transaction with description: {description}.");
+
+        while (invalidVendorInput)
+        {
+            ShowMessage("Enter a new vendor:");
+            input = GetInput();
+
+            if (input is not "" && description.ToLower().Contains(input.ToLower()))
+            {
+                invalidVendorInput = false;
+            }
+            else 
+            {
+                ShowMessage("That vendor is not present in the description. Try again.");
+            }
+        }
+
+        return input;
     }
 }

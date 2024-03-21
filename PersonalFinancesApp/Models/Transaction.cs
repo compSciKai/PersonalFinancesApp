@@ -1,13 +1,8 @@
 using CsvHelper.Configuration.Attributes;
-
 namespace PersonalFinances.Models;
+
+// TODO: Make transaction abstract class and RBCBanking derived class
 public class Transaction {
-    /*
-        Transaction Date
-        Amount
-        Vendor
-        Description
-    */
     [Name("Transaction Date")]
     public DateOnly Date { get; set; }
     [Name("CAD$")]
