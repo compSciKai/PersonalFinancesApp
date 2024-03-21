@@ -33,21 +33,36 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         }
     }
 
-    public string PromptForVendorValue(string description)
+    public KeyValuePair<string, string>? PromptForVendorKVP(string description)
     {
         bool invalidVendorInput = true;
-        string input = "";
+        string vendorKey = ""; 
+        string vendorValue = "";
+
         ShowMessage(
-        $"Vendor could not be found for this transaction with description: {description}.");
+        $"Vendor could not be found for this transaction with description: '{description}'.");
 
         while (invalidVendorInput)
         {
-            ShowMessage("Enter a new vendor:");
-            input = GetInput();
-
-            if (input is not "" && description.ToLower().Contains(input.ToLower()))
+            ShowMessage("Enter a string from the description that will identify the vendor for this transaction, or type 's' to skip");
+            vendorKey = GetInput();
+            
+            if (vendorKey == "s")
             {
-                invalidVendorInput = false;
+                return null;
+            }
+
+            if (vendorKey is not "" && description.ToLower().Contains(vendorKey.ToLower()))
+            {
+                ShowMessage($"What is the vendor's name for this transaction? Press enter to save as '{vendorKey}'");
+                vendorValue = GetInput();
+
+                if (vendorValue is "")
+                {
+                    vendorValue = vendorKey;
+                }
+
+                invalidVendorInput = false; 
             }
             else 
             {
@@ -55,6 +70,6 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             }
         }
 
-        return input;
+        return new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue.ToLower());
     }
 }

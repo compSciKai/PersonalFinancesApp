@@ -20,9 +20,9 @@ public class VendorsService : IVendorsService
     {
         foreach (var kvp in VendorsMap)
         {
-            if (taransactionData.Contains(kvp.Key))
+            if (taransactionData.ToLower().Contains(kvp.Key.ToLower()))
             {
-                return kvp.Value;
+                return kvp.Value.ToLower();
             }
         }
 

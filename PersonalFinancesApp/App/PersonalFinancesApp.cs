@@ -32,15 +32,21 @@ class PersonalFinancesApp
         {
             if (transaction.Vendor is null)
             {
-                string? vendor = _vendorsService.GetVendor(transaction.Description);
-                if (vendor == "")
+                string? vendorName = _vendorsService.GetVendor(transaction.Description);
+
+                if (vendorName == "")
                 {
-                    vendor = _transactionUserInteraction.PromptForVendorValue(transaction.Description);
+                    KeyValuePair<string, string>? vendorKVP = _transactionUserInteraction.PromptForVendorKVP(transaction.Description);
+                    if (vendorKVP is null)
+                    {
+                        continue;
+                    }
+
+                    _vendorsService.StoreNewVendor(vendorsFilePath, vendorKVP?.Key, vendorKVP?.Value);
+                    vendorName = vendorKVP?.Value;
                 }
 
-                transaction.Vendor = vendor;
-
-                // TODO: Save vendor to map
+                transaction.Vendor = vendorName;
             }
         }
 

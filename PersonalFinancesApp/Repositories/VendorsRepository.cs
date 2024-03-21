@@ -24,7 +24,8 @@ public class VendorsRepository : IVendorsRepository
 
     public void SaveVendorsMap(string path, Dictionary<string, string> map)
     {
-        var json = JsonSerializer.Serialize(map);
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        var json = JsonSerializer.Serialize(map, options);
         File.WriteAllText(path, json); 
     }
 }
