@@ -3,12 +3,18 @@ namespace PersonalFinances.Repositories;
 
 public class VendorsRepository : IVendorsRepository
 {
-    public Dictionary<string, string> LoadVendorsMap(string path)
+    private string _vendorsJsonFilePath;
+
+    public VendorsRepository(string vendersJsonPath)
     {
-        // TODO: check file type
-        if (File.Exists(path))
+        _vendorsJsonFilePath = vendersJsonPath;
+    }
+
+    public Dictionary<string, string> LoadVendorsMap()
+    {
+        if (File.Exists(_vendorsJsonFilePath))
         {
-            string json = File.ReadAllText(path);
+            string json = File.ReadAllText(_vendorsJsonFilePath);
             if (json != "")
             {
                 var map = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
@@ -22,10 +28,10 @@ public class VendorsRepository : IVendorsRepository
         return new Dictionary<string, string>();
     }
 
-    public void SaveVendorsMap(string path, Dictionary<string, string> map)
+    public void SaveVendorsMap(Dictionary<string, string> map)
     {
         var options = new JsonSerializerOptions { WriteIndented = true };
         var json = JsonSerializer.Serialize(map, options);
-        File.WriteAllText(path, json); 
+        File.WriteAllText(_vendorsJsonFilePath, json); 
     }
 }

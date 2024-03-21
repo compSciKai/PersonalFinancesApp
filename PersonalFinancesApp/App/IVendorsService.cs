@@ -1,11 +1,12 @@
-﻿using PersonalFinances.Repositories;
+﻿using PersonalFinances.Models;
+using PersonalFinances.Repositories;
 
 namespace PersonalFinances.App;
 
 public interface IVendorsService
 {
-    void Init(string VendorsFilePath);
     string GetVendor(string transactionData);
-    void StoreNewVendor(string path, string key, string vendorName);
+    void StoreNewVendor(string key, string vendorName);
     void StoreNewVendors(Dictionary<string, string> vendorsDictionary);
+    List<Transaction> AddVendorsToTransactions(List<Transaction> rawTransactions);
 }

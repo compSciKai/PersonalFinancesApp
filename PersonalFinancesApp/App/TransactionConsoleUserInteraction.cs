@@ -29,7 +29,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     {
         foreach (Transaction transaction in transactions)
         {
-            Console.WriteLine($"{transaction.Date}: {transaction.Vendor} - {transaction.Description} - {transaction.Amount}");
+            Console.WriteLine($"{transaction.Date.ToShortDateString()}: {transaction.Vendor} - {transaction.Description} - {transaction.Amount}");
         }
     }
 

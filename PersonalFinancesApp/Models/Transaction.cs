@@ -4,7 +4,7 @@ namespace PersonalFinances.Models;
 // TODO: Make transaction abstract class and RBCBanking derived class
 public class Transaction {
     [Name("Transaction Date")]
-    public DateOnly Date { get; set; }
+    public DateTime Date { get; set; }
     [Name("CAD$")]
     public float Amount { get; set; }
     [Name("Description 1")]

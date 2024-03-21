@@ -1,19 +1,20 @@
-﻿using PersonalFinances.Repositories;
+﻿using PersonalFinances.Models;
+using PersonalFinances.Repositories;
 namespace PersonalFinances.App;
 
 public class VendorsService : IVendorsService
 {
-    Dictionary<string, string>? VendorsMap {get; set;}
+    Dictionary<string, string> VendorsMap {get; set;}
     IVendorsRepository _vendorsRepository;
+    ITransactionsUserInteraction _transactionUserInteraction;
 
-    public VendorsService(IVendorsRepository vendorsRepository)
+    public VendorsService(
+        IVendorsRepository vendorsRepository,
+        ITransactionsUserInteraction transactionUserInteraction)
     {
         _vendorsRepository = vendorsRepository;
-    }
-
-    public void Init(string vendorsFilePath) 
-    {
-        VendorsMap = _vendorsRepository.LoadVendorsMap(vendorsFilePath);
+        _transactionUserInteraction = transactionUserInteraction;
+        VendorsMap = vendorsRepository.LoadVendorsMap();
     }
 
     public string GetVendor(string taransactionData)
@@ -29,10 +30,10 @@ public class VendorsService : IVendorsService
         return "";
     }
 
-    public void StoreNewVendor(string path, string key, string vendorName)
+    public void StoreNewVendor(string key, string vendorName)
     {
         VendorsMap.Add(key, vendorName);
-        _vendorsRepository.SaveVendorsMap(path, VendorsMap);
+        _vendorsRepository.SaveVendorsMap(VendorsMap);
     }
 
     public void StoreNewVendors(Dictionary<string, string> newVendorsEntries)
@@ -44,6 +45,33 @@ public class VendorsService : IVendorsService
                 VendorsMap[kvp.Key] = kvp.Value;
             }
         }
+    }
+
+    public List<Transaction> AddVendorsToTransactions(List<Transaction> transactions)
+    {
+        foreach (var transaction in transactions)
+        {
+            if (transaction.Vendor is null)
+            {
+                string? vendorName = GetVendor(transaction.Description);
+
+                if (vendorName == "")
+                {
+                    KeyValuePair<string, string>? vendorKVP = _transactionUserInteraction.PromptForVendorKVP(transaction.Description);
+                    if (vendorKVP is null)
+                    {
+                        continue;
+                    }
+
+                    StoreNewVendor(vendorKVP?.Key, vendorKVP?.Value);
+                    vendorName = vendorKVP?.Value;
+                }
+
+                transaction.Vendor = vendorName;
+            }
+        }
+
+        return transactions;
     }
 }
 

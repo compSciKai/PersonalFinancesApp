@@ -1,13 +1,16 @@
 ﻿using PersonalFinances.Repositories;
 using PersonalFinances.App;
 
+string testTransactionsCsvPath = "";
+string vendersJsonPath = "";
+var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
+
 var FinancesApp = new PersonalFinancesApp(
     new CsvTransactionRepository(),
-    new TransactionsConsoleUserInteraction(),
+    TransactionsConsoleUserInteraction,
     new VendorsService(
-        new VendorsRepository())
+        new VendorsRepository(vendersJsonPath),
+        TransactionsConsoleUserInteraction)
 );
 
-string testTransactionsCsvPath = "";
-string? vendersJsonPath = "";
-FinancesApp.Run(testTransactionsCsvPath, vendersJsonPath);
+FinancesApp.Run(testTransactionsCsvPath);

@@ -19,45 +19,24 @@ class PersonalFinancesApp
         _vendorsService = vendorsService; 
     }
 
-    public void Run(string transactionsFilePath, string vendorsFilePath)
+    public void Run(string transactionsFilePath)
     {
-        _vendorsService.Init(vendorsFilePath);
         Console.WriteLine("Finances App Initialized");
 
-        // TODO: Validate paths
 
         List<Transaction> rawTransactions = _transactionRepository.GetTransactions(transactionsFilePath);
+        List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
 
-        foreach (var transaction in rawTransactions)
-        {
-            if (transaction.Vendor is null)
-            {
-                string? vendorName = _vendorsService.GetVendor(transaction.Description);
+        DateTime lastMonth = LastDayOfLastMonth();
+        List<Transaction> monthlyTransactions = transactionsWithVendors.Where(transaction => transaction.Date > lastMonth).ToList();
 
-                if (vendorName == "")
-                {
-                    KeyValuePair<string, string>? vendorKVP = _transactionUserInteraction.PromptForVendorKVP(transaction.Description);
-                    if (vendorKVP is null)
-                    {
-                        continue;
-                    }
-
-                    _vendorsService.StoreNewVendor(vendorsFilePath, vendorKVP?.Key, vendorKVP?.Value);
-                    vendorName = vendorKVP?.Value;
-                }
-
-                transaction.Vendor = vendorName;
-            }
-        }
-
-        _transactionUserInteraction.OutputTransactions(rawTransactions);
+        _transactionUserInteraction.OutputTransactions(monthlyTransactions);
 
         // TODO: categorize
 
         // // Categorize Transactions
         // FinancialApp.OutputCategorized(transactions);
     }
-
 
     public void Run()
     {
@@ -70,5 +49,11 @@ class PersonalFinancesApp
         Console.WriteLine($"Vendors path is {vendorsPath}");
 
         // TODO: complete method call this(transactionPath?)
+    }
+
+    private DateTime LastDayOfLastMonth() 
+    {
+        DateTime firstDayofThisMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0);
+        return firstDayofThisMonth.AddSeconds(-1);
     }
 }
