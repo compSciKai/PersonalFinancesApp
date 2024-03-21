@@ -6,6 +6,6 @@ public interface ITransactionsUserInteraction
     void ShowMessage(string message);
     void Exit();
     string GetInput();
-    void OutputTransactions(IEnumerable<Transaction> transactions);
+    void OutputTransactions(List<Transaction> transactions);
     KeyValuePair<string, string>? PromptForVendorKVP(string transactionData);
 }
