@@ -7,35 +7,33 @@ class PersonalFinancesApp
     private readonly ITransactionsRepository _transactionRepository;
     private readonly ITransactionsUserInteraction _transactionUserInteraction;
     private readonly IVendorsService _vendorsService;
+    private readonly ICategoriesService _categoriesService;
 
     public PersonalFinancesApp(
         ITransactionsRepository transactionRepository, 
         ITransactionsUserInteraction transactionUserInteraction,
-        IVendorsService vendorsService
+        IVendorsService vendorsService,
+        ICategoriesService categoriesService
         )
     {
         _transactionRepository = transactionRepository;
         _transactionUserInteraction = transactionUserInteraction;
         _vendorsService = vendorsService; 
+        _categoriesService = categoriesService;
     }
 
     public void Run(string transactionsFilePath)
     {
         Console.WriteLine("Finances App Initialized");
 
-
         List<Transaction> rawTransactions = _transactionRepository.GetTransactions(transactionsFilePath);
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
+        List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
 
         DateTime lastMonth = LastDayOfLastMonth();
         List<Transaction> monthlyTransactions = transactionsWithVendors.Where(transaction => transaction.Date > lastMonth).ToList();
 
         _transactionUserInteraction.OutputTransactions(monthlyTransactions);
-
-        // TODO: categorize
-
-        // // Categorize Transactions
-        // FinancialApp.OutputCategorized(transactions);
     }
 
     public void Run()

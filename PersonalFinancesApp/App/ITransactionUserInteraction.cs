@@ -8,4 +8,5 @@ public interface ITransactionsUserInteraction
     string GetInput();
     void OutputTransactions(List<Transaction> transactions);
     KeyValuePair<string, string>? PromptForVendorKVP(string transactionData);
+    KeyValuePair<string, string>? PromptForCategoryKVP(string description);
 }

@@ -3,6 +3,7 @@ using PersonalFinances.App;
 
 string testTransactionsCsvPath = "";
 string vendersJsonPath = "";
+string categoriesJsonPath = "";
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 
 var FinancesApp = new PersonalFinancesApp(
@@ -10,6 +11,9 @@ var FinancesApp = new PersonalFinancesApp(
     TransactionsConsoleUserInteraction,
     new VendorsService(
         new VendorsRepository(vendersJsonPath),
+        TransactionsConsoleUserInteraction),
+    new CategoriesService(
+        new CategoriesRepository(categoriesJsonPath),
         TransactionsConsoleUserInteraction)
 );
 

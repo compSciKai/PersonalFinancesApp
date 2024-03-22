@@ -1,4 +1,5 @@
-﻿using System.Data;
+﻿using System.ComponentModel;
+using System.Data;
 using DataTablePrettyPrinter;
 using PersonalFinances.Models;
 
@@ -37,11 +38,14 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         for (int i = 0; i < transactions.Count(); i++)
         {
             string vendor = transactions[i].Vendor.ToUpper();
+            string category = transactions[i].Category.ToUpper();
+
 
             DataRow row = table.NewRow();
             row["ID"] = i+1;
             row["Date"] = transactions[i].Date.ToShortDateString();
             row["Vendor Name"] = vendor;
+            row["Category"] = category;
             row["Description"] = transactions[i].Description;
             row["Amount"] = transactions[i].Amount.ToString("0.00");
 
@@ -69,6 +73,8 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         totalRow["Type"] = "Total";
         totalRow["Amount"] = totalPayments + totalExpenses;
         transactionSubtotalsTable.Rows.Add(totalRow);
+
+        // source: https://github.com/fjeremic/DataTablePrettyPrinter
         Console.WriteLine(transactionSubtotalsTable.ToPrettyPrintedString());
     }
 
@@ -131,6 +137,12 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         vNameColumn.DefaultValue = "Vendor Name";
         transactionsTable.Columns.Add(vNameColumn);
 
+        DataColumn categoryColumn = new DataColumn();
+        categoryColumn.DataType = System.Type.GetType("System.String");
+        categoryColumn.ColumnName = "Category";
+        categoryColumn.DefaultValue = "Category";
+        transactionsTable.Columns.Add(categoryColumn);
+
         DataColumn descriptionColumn = new DataColumn();
         descriptionColumn.DataType = System.Type.GetType("System.String");
         descriptionColumn.ColumnName = "Description";
@@ -189,5 +201,45 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         }
 
         return new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue.ToLower());
+    }
+
+    public KeyValuePair<string, string>? PromptForCategoryKVP(string vendor)
+    {
+        bool invalidCategoryInput = true;
+        string categoryKey = ""; 
+        string categoryValue = "";
+
+        ShowMessage(
+        $"Category could not be found for this vendor: '{vendor}'.");
+
+        while (invalidCategoryInput)
+        {
+            ShowMessage("Enter a string from the vendor that will identify the category for this vendor, or type 's' to skip");
+            categoryKey = GetInput();
+            
+            if (categoryKey == "s")
+            {
+                return null;
+            }
+
+            if (categoryKey is not "" && vendor.ToLower().Contains(categoryKey.ToLower()))
+            {
+                ShowMessage($"What is the category for this vendor? Press enter to save as '{categoryKey}'");
+                categoryValue = GetInput();
+
+                if (categoryValue is "")
+                {
+                    categoryValue = categoryKey;
+                }
+
+                invalidCategoryInput = false; 
+            }
+            else 
+            {
+                ShowMessage("That value is not present in the vendor name. Try again.");
+            }
+        }
+
+        return new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower());
     }
 }
