@@ -6,7 +6,7 @@ public interface ITransactionsUserInteraction
     void ShowMessage(string message);
     void Exit();
     string GetInput();
-    void OutputTransactions(List<Transaction> transactions);
+    void OutputTransactions(List<Transaction> transactions, string tableName);
     KeyValuePair<string, string>? PromptForVendorKVP(string transactionData);
     KeyValuePair<string, string>? PromptForCategoryKVP(string description);
 }

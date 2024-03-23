@@ -28,12 +28,12 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         Console.ReadKey();
     }
 
-    public void OutputTransactions(List<Transaction> transactions)
+    public void OutputTransactions(List<Transaction> transactions, string tableName)
     {
         // source: https://learn.microsoft.com/en-us/dotnet/api/system.data.datarow?view=net-8.0
 
         DataTable table;
-        table = MakeTransactionsTable();
+        table = MakeTransactionsTable(tableName.ToUpper());
 
         for (int i = 0; i < transactions.Count(); i++)
         {
@@ -112,12 +112,12 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         return subtotalsTable;
     }
 
-    private DataTable MakeTransactionsTable()
+    private DataTable MakeTransactionsTable(string tableName)
     {
         // source: https://learn.microsoft.com/en-us/dotnet/api/system.data.datarow?view=net-8.0
 
         // Create a new DataTable titled 'Transactions.'
-        DataTable transactionsTable = new DataTable("Transactions");
+        DataTable transactionsTable = new DataTable(tableName);
 
         // Add column objects to the table.
         DataColumn idColumn = new  DataColumn();

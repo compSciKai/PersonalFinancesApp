@@ -1,5 +1,6 @@
 using PersonalFinances.Repositories;
 using PersonalFinances.Models;
+using System.ComponentModel;
 
 namespace PersonalFinances.App;
 class PersonalFinancesApp
@@ -30,10 +31,20 @@ class PersonalFinancesApp
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
 
-        DateTime lastMonth = LastDayOfLastMonth();
-        List<Transaction> monthlyTransactions = transactionsWithVendors.Where(transaction => transaction.Date > lastMonth).ToList();
+        // DateTime lastMonth = LastDayOfLastMonth();
+        // List<Transaction> monthlyTransactions = transactionsWithVendors.Where(transaction => transaction.Date > lastMonth).ToList();
 
-        _transactionUserInteraction.OutputTransactions(monthlyTransactions);
+        // Output all transactions
+        _transactionUserInteraction.OutputTransactions(transactionsWithCategories, "Transactions");
+
+        // Output by category
+        List<string> categories = _categoriesService.GetAllCategories();
+
+        foreach (string category in categories)
+        {
+            List<Transaction> categorizedTransactions = transactionsWithCategories.Where(transaction => transaction.Category == category).ToList();
+            _transactionUserInteraction.OutputTransactions(categorizedTransactions, category);
+        }
     }
 
     public void Run()

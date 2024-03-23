@@ -30,6 +30,11 @@ public class CategoriesService : ICategoriesService
         return "";
     }
 
+    public List<string> GetAllCategories()
+    {
+        return CategoriesMap.Values.Distinct().ToList();
+    }
+
     public void StoreNewCategory(string key, string categoryName)
     {
         CategoriesMap.Add(key, categoryName);
