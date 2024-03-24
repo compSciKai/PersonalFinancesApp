@@ -34,6 +34,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
         DataTable table;
         table = MakeTransactionsTable(tableName.ToUpper());
+        table.Columns[0].SetShowColumnName(false);
 
         for (int i = 0; i < transactions.Count(); i++)
         {
@@ -52,30 +53,54 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             table.Rows.Add(row);
         }
 
-        Console.WriteLine(table.ToPrettyPrintedString());
 
         decimal totalExpenses = table.AsEnumerable().Where(row => row.Field<string>("Vendor Name") != "VISA PAYMENT").Sum(row => row.Field<decimal>("Amount"));
-        decimal totalPayments = table.AsEnumerable().Where(row => row.Field<string>("Vendor Name") == "VISA PAYMENT").Sum(row => row.Field<decimal>("Amount"));
 
-        DataTable transactionSubtotalsTable = MakeSubtotalsTable();
+        DataRow subtotalsRow = table.NewRow();
+        subtotalsRow["Description"] = "SUBTOTAL";
+        subtotalsRow["Amount"] = totalExpenses;
+        subtotalsRow["Vendor Name"] = "";
+        subtotalsRow["Category"] = "";
+        
+        table.Rows.Add(subtotalsRow);
 
-        DataRow expensesRow = transactionSubtotalsTable.NewRow();
-        expensesRow["Type"] = "Expenses";
-        expensesRow["Amount"] = totalExpenses;
-        transactionSubtotalsTable.Rows.Add(expensesRow);
+        FormatTableWidths(table);
+        table.SetTitleTextAlignment(TextAlignment.Left);
 
-        DataRow paymentsRow = transactionSubtotalsTable.NewRow();
-        paymentsRow["Type"] = "Payments";
-        paymentsRow["Amount"] = totalPayments;
-        transactionSubtotalsTable.Rows.Add(paymentsRow);
+        Console.WriteLine(table.ToPrettyPrintedString());
 
-        DataRow totalRow = transactionSubtotalsTable.NewRow();
-        totalRow["Type"] = "Total";
-        totalRow["Amount"] = totalPayments + totalExpenses;
-        transactionSubtotalsTable.Rows.Add(totalRow);
 
-        // source: https://github.com/fjeremic/DataTablePrettyPrinter
-        Console.WriteLine(transactionSubtotalsTable.ToPrettyPrintedString());
+        // DataRow expensesRow = transactionSubtotalsTable.NewRow();
+        // expensesRow["Type"] = "Expenses";
+        // expensesRow["Amount"] = totalExpenses;
+        // transactionSubtotalsTable.Rows.Add(expensesRow);
+
+        // DataRow paymentsRow = transactionSubtotalsTable.NewRow();
+        // paymentsRow["Type"] = "Payments";
+        // paymentsRow["Amount"] = totalPayments;
+        // transactionSubtotalsTable.Rows.Add(paymentsRow);
+
+        // DataRow totalRow = transactionSubtotalsTable.NewRow();
+        // totalRow["Type"] = "Total";
+        // totalRow["Amount"] = totalPayments + totalExpenses;
+        // transactionSubtotalsTable.Rows.Add(totalRow);
+
+        // // source: https://github.com/fjeremic/DataTablePrettyPrinter
+        //Console.WriteLine(transactionSubtotalsTable.ToPrettyPrintedString());
+    }
+
+    private void FormatTableWidths(DataTable table)
+    {
+        table.Columns[0].SetWidth(4);
+        table.Columns[1].SetWidth(15);
+        table.Columns[2].SetWidth(25);
+        table.Columns[3].SetWidth(18);
+        table.Columns[4].SetWidth(42);
+        table.Columns[5].SetWidth(11);
+
+
+
+
     }
 
     private DataTable MakeSubtotalsTable()

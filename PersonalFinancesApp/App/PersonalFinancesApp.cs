@@ -35,7 +35,7 @@ class PersonalFinancesApp
         // List<Transaction> monthlyTransactions = transactionsWithVendors.Where(transaction => transaction.Date > lastMonth).ToList();
 
         // Output all transactions
-        _transactionUserInteraction.OutputTransactions(transactionsWithCategories, "Transactions");
+        _transactionUserInteraction.OutputTransactions(transactionsWithCategories, "All Transactions");
 
         // Output by category
         List<string> categories = _categoriesService.GetAllCategories();
