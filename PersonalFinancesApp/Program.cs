@@ -2,8 +2,9 @@
 using PersonalFinances.App;
 
 string testTransactionsCsvPath = "";
-string vendersJsonPath = "";
-string categoriesJsonPath = "";
+string vendersJsonPath = "./vendors.json";
+string categoriesJsonPath = "./categories.json";
+string BudgetProfilesJsonPath = "./budgetProfiles.json";
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 
 var FinancesApp = new PersonalFinancesApp(
@@ -14,6 +15,9 @@ var FinancesApp = new PersonalFinancesApp(
         TransactionsConsoleUserInteraction),
     new CategoriesService(
         new CategoriesRepository(categoriesJsonPath),
+        TransactionsConsoleUserInteraction),
+    new BudgetService(
+        new BudgetRepository(BudgetProfilesJsonPath),
         TransactionsConsoleUserInteraction)
 );
 

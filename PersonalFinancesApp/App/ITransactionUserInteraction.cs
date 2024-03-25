@@ -9,4 +9,5 @@ public interface ITransactionsUserInteraction
     void OutputTransactions(List<Transaction> transactions, string tableName);
     KeyValuePair<string, string>? PromptForVendorKVP(string transactionData);
     KeyValuePair<string, string>? PromptForCategoryKVP(string description);
+    string? PromptForProfileChoice(List<string> profileNames);
 }

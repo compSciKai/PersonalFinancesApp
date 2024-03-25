@@ -28,6 +28,44 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         Console.ReadKey();
     }
 
+    public string? PromptForProfileChoice(List<string> profileNames)
+    {
+        int nameCount = profileNames.Count;
+        while (true)
+        {
+            ShowMessage("Which budget profile would you like to use?\n");
+            for (int i = 0; i < nameCount; i++)
+            {
+                Console.WriteLine($"{i+1}. {profileNames[i]}");
+            }
+
+            ShowMessage($"{nameCount + 1}. Create New Profile");
+            ShowMessage($"{nameCount + 2}. Exit");
+
+            var input = GetInput();
+
+            int choiceIndex;
+            if(int.TryParse(input, out choiceIndex))
+            {
+                choiceIndex--;
+                if (choiceIndex >= 0 && choiceIndex < nameCount)
+                {
+                    return profileNames[choiceIndex];
+                }
+                else if (choiceIndex == nameCount) // Create new profile
+                {
+                    return null;
+                }
+                else if (choiceIndex == nameCount + 1) // Exit App
+                {
+                    Exit();
+                }
+            }
+
+            ShowMessage("Incorrect input. Please try again");
+        }
+    }
+
     public void OutputTransactions(List<Transaction> transactions, string tableName)
     {
         // source: https://learn.microsoft.com/en-us/dotnet/api/system.data.datarow?view=net-8.0
@@ -62,6 +100,11 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         subtotalsRow["Vendor Name"] = "";
         subtotalsRow["Category"] = "";
         
+        DataRow dividerRow = table.NewRow();
+        dividerRow["Category"] = "";
+        dividerRow["Vendor Name"] = "";
+
+        table.Rows.Add(dividerRow);
         table.Rows.Add(subtotalsRow);
 
         FormatTableWidths(table);
