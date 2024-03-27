@@ -66,7 +66,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         }
     }
 
-    public void OutputTransactions(List<Transaction> transactions, string tableName)
+    public void OutputTransactions(List<Transaction> transactions, string tableName, BudgetProfile? profile)
     {
         // source: https://learn.microsoft.com/en-us/dotnet/api/system.data.datarow?view=net-8.0
 
@@ -107,29 +107,32 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         table.Rows.Add(dividerRow);
         table.Rows.Add(subtotalsRow);
 
+        if (profile is not null && profile.BudgetCategories.ContainsKey(tableName))
+        {
+            decimal limit = (decimal)profile.BudgetCategories[tableName];
+            decimal remaining = limit + totalExpenses;
+
+
+            DataRow budgetLimitRow = table.NewRow();
+            budgetLimitRow["Category"] = "";
+            budgetLimitRow["Vendor Name"] = "";
+            budgetLimitRow["Description"] = "BUDGET LIMIT";
+            budgetLimitRow["Amount"] = limit.ToString("0.00");
+            table.Rows.Add(budgetLimitRow);
+
+
+            DataRow budgetRatioRow = table.NewRow();
+            budgetRatioRow["Category"] = "";
+            budgetRatioRow["Vendor Name"] = "";
+            budgetRatioRow["Description"] = "BUDGET REMAINING";
+            budgetRatioRow["Amount"] = remaining.ToString("0.00");
+            table.Rows.Add(budgetRatioRow);
+        }
+
         FormatTableWidths(table);
         table.SetTitleTextAlignment(TextAlignment.Left);
 
         Console.WriteLine(table.ToPrettyPrintedString());
-
-
-        // DataRow expensesRow = transactionSubtotalsTable.NewRow();
-        // expensesRow["Type"] = "Expenses";
-        // expensesRow["Amount"] = totalExpenses;
-        // transactionSubtotalsTable.Rows.Add(expensesRow);
-
-        // DataRow paymentsRow = transactionSubtotalsTable.NewRow();
-        // paymentsRow["Type"] = "Payments";
-        // paymentsRow["Amount"] = totalPayments;
-        // transactionSubtotalsTable.Rows.Add(paymentsRow);
-
-        // DataRow totalRow = transactionSubtotalsTable.NewRow();
-        // totalRow["Type"] = "Total";
-        // totalRow["Amount"] = totalPayments + totalExpenses;
-        // transactionSubtotalsTable.Rows.Add(totalRow);
-
-        // // source: https://github.com/fjeremic/DataTablePrettyPrinter
-        //Console.WriteLine(transactionSubtotalsTable.ToPrettyPrintedString());
     }
 
     private void FormatTableWidths(DataTable table)

@@ -2,6 +2,6 @@ namespace PersonalFinances.Repositories;
 
 public interface IBudgetRepository
 {
-    void SaveBudgetProfiles(Dictionary<string, BudgetProfile> profiles);
-    Dictionary<string, BudgetProfile> LoadBudgetProfiles();
+    void SaveBudgetProfiles(List<BudgetProfile> profiles);
+    List<BudgetProfile> LoadBudgetProfiles();
 }

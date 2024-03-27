@@ -30,21 +30,25 @@ class PersonalFinancesApp
     public void Run(string transactionsFilePath)
     {
         Console.WriteLine("Finances App Initialized\n");
-
         List<string> categories = _categoriesService.GetAllCategories();
-        // if (categories.Count == 0)
-        // {
-        //     _transactionUserInteraction.ShowMessage("No budget categories created yet. Please create them now.");
-        //     _transactionUserInteraction.PromptFor
-        // }
-
 
         BudgetProfile? profile = _budgetService.GetActiveProfile();
         if (profile is null)
         {
             // TODO: create budget categories ahead of time
-            _transactionUserInteraction.ShowMessage("No budget profiles found. Creating a new one now.");
+            _transactionUserInteraction.ShowMessage("No budget profiles found. Creating first profile...");
             profile = _budgetService.CreateNewProfile();
+        }
+
+        // TODO: output profile. Ask user if it is okay or would like to edit
+        _transactionUserInteraction.ShowMessage($"Budget profile set to:\n");
+        _transactionUserInteraction.ShowMessage(profile.ToString());
+
+        _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, or enter to continue...");
+        var input = _transactionUserInteraction.GetInput();
+        if (input == "q")
+        {
+            _transactionUserInteraction.Exit();
         }
 
         // pass profile int
@@ -58,13 +62,13 @@ class PersonalFinancesApp
         // List<Transaction> monthlyTransactions = transactionsWithVendors.Where(transaction => transaction.Date > lastMonth).ToList();
 
         // Output all transactions
-        _transactionUserInteraction.OutputTransactions(transactionsWithCategories, "All Transactions");
+        _transactionUserInteraction.OutputTransactions(transactionsWithCategories, "All Transactions", null);
 
         // Output by category
         foreach (string category in categories)
         {
             List<Transaction> categorizedTransactions = transactionsWithCategories.Where(transaction => transaction.Category == category).ToList();
-            _transactionUserInteraction.OutputTransactions(categorizedTransactions, category);
+            _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
         }
 
         // TODO: write report

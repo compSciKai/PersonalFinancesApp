@@ -5,7 +5,7 @@ namespace PersonalFinances.App;
 
 public class BudgetService : IBudgetService
 {
-    Dictionary<string, BudgetProfile> BudgetProfiles {get; set;}
+    List<BudgetProfile> BudgetProfiles {get; set;}
     IBudgetRepository _budgetRepository;
     ITransactionsUserInteraction _transactionUserInteraction;
 
@@ -19,18 +19,12 @@ public class BudgetService : IBudgetService
     }
     public BudgetProfile? GetProfile(string profileName)
     {
-        BudgetProfile profile;
-        if (BudgetProfiles.TryGetValue(profileName, out profile))
-        {
-            return profile;
-        }
-
-        return null;
+        return BudgetProfiles.Find(profile => profile.Name == profileName);
     }
 
-    public void StoreProfile(string profileName, BudgetProfile profile)
+    public void StoreProfile(BudgetProfile profile)
     {
-        BudgetProfiles.Add(profileName, profile);
+        BudgetProfiles.Add(profile);
         _budgetRepository.SaveBudgetProfiles(BudgetProfiles);
     }
 
@@ -38,9 +32,9 @@ public class BudgetService : IBudgetService
     {
         List<string> profileNames = new List<string>();
 
-        foreach (var kvp in BudgetProfiles)
+        foreach (var profile in BudgetProfiles)
         {
-            profileNames.Add(kvp.Key);
+            profileNames.Add(profile.Name);
         }
 
         return profileNames;
@@ -66,7 +60,6 @@ public class BudgetService : IBudgetService
             profileChoice = _transactionUserInteraction.PromptForProfileChoice(profileNames);
         }
 
-        BudgetProfile profile;
         if (profileChoice is not null)
         {
             return GetProfile(profileChoice);
@@ -80,7 +73,7 @@ public class BudgetService : IBudgetService
         _transactionUserInteraction.ShowMessage("What is the name for this profile?");
         string name = _transactionUserInteraction.GetInput();
 
-        _transactionUserInteraction.ShowMessage("Set a description for this profile, or press enter.");
+        _transactionUserInteraction.ShowMessage("Set a description for this profile, or press enter.\n");
         string description = _transactionUserInteraction.GetInput();
 
         Dictionary<string, double> budgets = new Dictionary<string, double>();
@@ -88,12 +81,12 @@ public class BudgetService : IBudgetService
         while (isMoreCategories)
         {
             _transactionUserInteraction.ShowMessage("Add a new budget category."
-            + " Type 'f' when finished.");
+            + " press enter when finished.\n");
             string newCategory = _transactionUserInteraction.GetInput();
 
-            if (newCategory != "f")
+            if (newCategory != "")
             {
-                _transactionUserInteraction.ShowMessage("What is the limit for this budget category?");
+                _transactionUserInteraction.ShowMessage("What is the limit for this budget category?\n");
                 string stringAmount = _transactionUserInteraction.GetInput();
 
                 // TODO: try to set dictionary. Input might fail if tried twice
@@ -101,17 +94,8 @@ public class BudgetService : IBudgetService
                 if (double.TryParse(stringAmount, out amount))
                 {
                     budgets[newCategory] = amount;
-                    _transactionUserInteraction.ShowMessage($"{newCategory} set to ${amount.ToString("0.00")}");
+                    _transactionUserInteraction.ShowMessage($"\n{newCategory} set to ${amount.ToString("0.00")}");
                 }
-
-                
-
-                /*
-                    create a prompt user interaction function
-                    get a dictionary of all the budget categories and their amounts
-
-                    consider using the categories set by a profile, as categories in the output function
-                */
             }
             else
             {
@@ -120,7 +104,7 @@ public class BudgetService : IBudgetService
         }
 
         BudgetProfile newBudgetProfile = new BudgetProfile(name, budgets, description);
-        StoreProfile(name, newBudgetProfile);
+        StoreProfile(newBudgetProfile);
 
         return newBudgetProfile;
     }

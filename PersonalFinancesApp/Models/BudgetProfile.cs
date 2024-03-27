@@ -1,3 +1,4 @@
+using PersonalFinances.Extentions;
 public class BudgetProfile
 {
     public string Name { get; set; }
@@ -9,5 +10,10 @@ public class BudgetProfile
         Name = name;
         Description = description;
         BudgetCategories = budgetCategories;
+    }
+
+    public override string ToString()
+    {
+        return $"Name: {Name}\nDescription: {Description}\n\nBudget:\n{BudgetCategories.ToString(": $", "\n")}";
     }
 }

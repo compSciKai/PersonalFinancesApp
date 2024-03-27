@@ -10,14 +10,14 @@ public class BudgetRepository : IBudgetRepository
         _jsonFilePath = jsonFilePath;
     }
 
-    public Dictionary<string, BudgetProfile> LoadBudgetProfiles()
+    public List<BudgetProfile> LoadBudgetProfiles()
     {
         if (File.Exists(_jsonFilePath))
         {
             string json = File.ReadAllText(_jsonFilePath);
             if (json != "")
             {
-                var profiles = JsonSerializer.Deserialize<Dictionary<string, BudgetProfile>>(json);
+                var profiles = JsonSerializer.Deserialize<List<BudgetProfile>>(json);
                 if (profiles is not null)
                 {
                     return profiles;
@@ -25,10 +25,10 @@ public class BudgetRepository : IBudgetRepository
             }
         }
 
-        return new Dictionary<string, BudgetProfile>();
+        return new List<BudgetProfile>();
     }
 
-    public void SaveBudgetProfiles(Dictionary<string, BudgetProfile> profiles)
+    public void SaveBudgetProfiles(List<BudgetProfile> profiles)
     {
         var options = new JsonSerializerOptions { WriteIndented = true };
         var json = JsonSerializer.Serialize(profiles, options);
