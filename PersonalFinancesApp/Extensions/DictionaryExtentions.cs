@@ -12,5 +12,4 @@ public static class DictionaryExtensions
 
     return string.Join(sequenceSeparator, pairs).ToUpper();
     }
-
 }

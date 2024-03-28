@@ -1,4 +1,3 @@
-using PersonalFinances.Models;
 using PersonalFinances.Repositories;
 
 namespace PersonalFinances.App;

@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using System.Data;
+﻿using System.Data;
 using DataTablePrettyPrinter;
 using PersonalFinances.Models;
 
@@ -18,8 +17,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
     public string GetInput() 
     {
-        string input = Console.ReadLine();
-        return input;
+        return Console.ReadLine();
     }
 
     public void Exit() 

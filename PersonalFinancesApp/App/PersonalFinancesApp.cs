@@ -1,7 +1,5 @@
 using PersonalFinances.Repositories;
 using PersonalFinances.Models;
-using System.ComponentModel;
-using System.Runtime;
 
 namespace PersonalFinances.App;
 class PersonalFinancesApp
