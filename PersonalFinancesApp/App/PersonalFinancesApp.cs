@@ -56,16 +56,19 @@ class PersonalFinancesApp
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
 
         // TODO: create enums for date ranges. Create date filter class -> pass in transactions
-        // DateTime lastMonth = LastDayOfLastMonth();
-        // List<Transaction> monthlyTransactions = transactionsWithVendors.Where(transaction => transaction.Date > lastMonth).ToList();
+        DateTime lastMonthEnd = LastDayOfLastMonth();
+        DateTime lastMonthStart = FirstDayOfLastMonth();
+        List<Transaction> monthlyTransactions = transactionsWithCategories.Where(
+            transaction => transaction.Date > lastMonthStart && transaction.Date < lastMonthEnd
+            ).ToList();
 
         // Output all transactions
-        _transactionUserInteraction.OutputTransactions(transactionsWithCategories, "All Transactions", null);
+        _transactionUserInteraction.OutputTransactions(monthlyTransactions, "Last Month's Transactions", null);
 
         // Output by category
         foreach (string category in categories)
         {
-            List<Transaction> categorizedTransactions = transactionsWithCategories.Where(transaction => transaction.Category == category).ToList();
+            List<Transaction> categorizedTransactions = monthlyTransactions.Where(transaction => transaction.Category == category).ToList();
             _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
         }
 
@@ -92,5 +95,10 @@ class PersonalFinancesApp
     {
         DateTime firstDayofThisMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0);
         return firstDayofThisMonth.AddSeconds(-1);
+    }
+
+    private DateTime FirstDayOfLastMonth()
+    {
+        return new DateTime(DateTime.Now.Year, DateTime.Now.Month - 1, 1, 0, 0, 0);
     }
 }
