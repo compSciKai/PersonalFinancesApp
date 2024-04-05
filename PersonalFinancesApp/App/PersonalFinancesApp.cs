@@ -38,9 +38,12 @@ class PersonalFinancesApp
             profile = _budgetService.CreateNewProfile();
         }
 
+        double budgetTotal = _budgetService.GetBudgetTotal(profile);
+
         // TODO: output profile. Ask user if it is okay or would like to edit
         _transactionUserInteraction.ShowMessage($"Budget profile set to:\n");
         _transactionUserInteraction.ShowMessage(profile.ToString());
+        _transactionUserInteraction.ShowMessage($"\nBudget Total: ${budgetTotal.ToString("0.00")}");
 
         _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, or enter to continue...");
         var input = _transactionUserInteraction.GetInput();

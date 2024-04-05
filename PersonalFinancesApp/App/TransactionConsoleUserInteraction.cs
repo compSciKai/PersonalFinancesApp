@@ -39,6 +39,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
             ShowMessage($"{nameCount + 1}. Create New Profile");
             ShowMessage($"{nameCount + 2}. Exit");
+            ShowMessage("");
 
             var input = GetInput();
 

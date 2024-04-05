@@ -1,3 +1,4 @@
+using System.Numerics;
 using PersonalFinances.Repositories;
 
 namespace PersonalFinances.App;
@@ -75,6 +76,17 @@ public class BudgetService : IBudgetService
         _transactionUserInteraction.ShowMessage("Set a description for this profile, or press enter.\n");
         string description = _transactionUserInteraction.GetInput();
 
+        bool isIncorrectIncomeValue = true;
+        double income = 0;
+        while (isIncorrectIncomeValue)
+        {
+            _transactionUserInteraction.ShowMessage("What is the monthly take-home income for this profile?\n");
+            string incomeString = _transactionUserInteraction.GetInput();
+
+            isIncorrectIncomeValue = !double.TryParse(incomeString, out income);
+        }
+        
+
         Dictionary<string, double> budgets = new Dictionary<string, double>();
         bool isMoreCategories = true;
         while (isMoreCategories)
@@ -102,9 +114,22 @@ public class BudgetService : IBudgetService
             }
         }
 
-        BudgetProfile newBudgetProfile = new BudgetProfile(name, budgets, description);
+        BudgetProfile newBudgetProfile = new BudgetProfile(name, budgets, income, description);
         StoreProfile(newBudgetProfile);
 
         return newBudgetProfile;
+    }
+
+    public double GetBudgetTotal(BudgetProfile profile)
+    {
+        List<double> budgetCategoryTotals = profile.BudgetCategories.Values.ToList();
+
+        double sum = 0;
+        foreach (var total in budgetCategoryTotals)
+        {
+            sum += total;
+        }
+
+        return sum;
     }
 }

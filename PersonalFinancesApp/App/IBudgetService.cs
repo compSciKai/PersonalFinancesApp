@@ -6,4 +6,5 @@ public interface IBudgetService
     void StoreProfile(BudgetProfile profile);
     BudgetProfile CreateNewProfile();
     BudgetProfile? GetActiveProfile();
+    double GetBudgetTotal(BudgetProfile profile);
 }
