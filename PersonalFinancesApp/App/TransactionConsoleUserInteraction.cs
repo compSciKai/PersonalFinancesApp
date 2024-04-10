@@ -24,6 +24,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     {
         Console.WriteLine("Press any key to exit.");
         Console.ReadKey();
+        System.Environment.Exit(1);
     }
 
     public string? PromptForProfileChoice(List<string> profileNames)
