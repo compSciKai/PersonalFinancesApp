@@ -33,7 +33,6 @@ class PersonalFinancesApp
         BudgetProfile? profile = _budgetService.GetActiveProfile();
         if (profile is null)
         {
-            // TODO: create budget categories ahead of time
             _transactionUserInteraction.ShowMessage("No budget profiles found. Creating first profile...");
             profile = _budgetService.CreateNewProfile();
         }
@@ -62,7 +61,8 @@ class PersonalFinancesApp
         DateTime lastMonthEnd = LastDayOfLastMonth();
         DateTime lastMonthStart = FirstDayOfLastMonth();
         List<Transaction> monthlyTransactions = transactionsWithCategories.Where(
-            transaction => transaction.Date > lastMonthStart && transaction.Date < lastMonthEnd
+            // transaction => transaction.Date > lastMonthStart && transaction.Date < lastMonthEnd
+            transaction => transaction.Date > lastMonthEnd
             ).ToList();
 
         // Output all transactions
@@ -75,10 +75,8 @@ class PersonalFinancesApp
             _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
         }
 
-        // TODO: write report
-        /*
-            show each category, plus minus and percentages used. How much under or over budget
-        */
+        // Export to File
+        _transactionRepository.ExportTransactions(monthlyTransactions, "../../../../test-export.csv");
     }
 
     public void Run()
@@ -98,6 +96,11 @@ class PersonalFinancesApp
     {
         DateTime firstDayofThisMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0);
         return firstDayofThisMonth.AddSeconds(-1);
+    }
+    
+    private DateTime FirstDayOfThisMonth() 
+    {
+        return new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0);
     }
 
     private DateTime FirstDayOfLastMonth()

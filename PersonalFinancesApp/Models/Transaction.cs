@@ -8,7 +8,13 @@ public class Transaction {
     [Name("CAD$")]
     public float Amount { get; set; }
     [Name("Description 1")]
-    public string Description { get; set; }
+    public string Description1 { get; set; }
+    [Name("Description 2")]
+    public string Description2 { get; set; }
     public string? Category { get; set; }
     public string? Vendor { get; set; }
+
+    public string Description {
+        get { return new String(Description1 + " " + Description2).TrimEnd(); }
+    }
 }

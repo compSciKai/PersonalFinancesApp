@@ -29,4 +29,13 @@ public class CsvTransactionRepository : ITransactionsRepository
             return transactionEnumerable.ToList();
         }
     }
+
+    public void ExportTransactions(List<Transaction> transactions, string filePath)
+    {
+        using (var writer = new StreamWriter(filePath))
+        using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+        {
+            csv.WriteRecords(transactions);
+        }
+    }
 }
