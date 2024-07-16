@@ -82,6 +82,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
             DataRow row = table.NewRow();
             row["ID"] = i+1;
+            row["Account Type"] = transactions[i].AccountType;
             row["Date"] = transactions[i].Date.ToShortDateString();
             row["Vendor Name"] = vendor;
             row["Category"] = category;
@@ -91,8 +92,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             table.Rows.Add(row);
         }
 
-
-        decimal totalExpenses = table.AsEnumerable().Where(row => row.Field<string>("Vendor Name") != "VISA PAYMENT").Sum(row => row.Field<decimal>("Amount"));
+        decimal totalExpenses = table.AsEnumerable().Sum(row => row.Field<decimal>("Amount"));
 
         DataRow subtotalsRow = table.NewRow();
         subtotalsRow["Description"] = "SUBTOTAL";
@@ -138,11 +138,12 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     private void FormatTableWidths(DataTable table)
     {
         table.Columns[0].SetWidth(4);
-        table.Columns[1].SetWidth(15);
-        table.Columns[2].SetWidth(25);
-        table.Columns[3].SetWidth(18);
-        table.Columns[4].SetWidth(42);
-        table.Columns[5].SetWidth(11);
+        table.Columns[1].SetWidth(12);
+        table.Columns[2].SetWidth(15);
+        table.Columns[3].SetWidth(25);
+        table.Columns[4].SetWidth(18);
+        table.Columns[5].SetWidth(42);
+        table.Columns[6].SetWidth(11);
 
 
 
@@ -196,6 +197,11 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         idColumn.ColumnName = "ID";
         idColumn.AutoIncrement = true;
         transactionsTable.Columns.Add(idColumn);
+
+        DataColumn accountTypeColumn = new  DataColumn();
+        accountTypeColumn.DataType = System.Type.GetType("System.String");
+        accountTypeColumn.ColumnName = "Account Type";
+        transactionsTable.Columns.Add(accountTypeColumn);
 
         DataColumn dateColumn = new  DataColumn();
         dateColumn.DataType = System.Type.GetType("System.DateTime");

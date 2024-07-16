@@ -51,8 +51,6 @@ class PersonalFinancesApp
             _transactionUserInteraction.Exit();
         }
 
-        // pass profile int
-
         List<Transaction> rawTransactions = _transactionRepository.GetTransactions(transactionsFilePath);
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
@@ -66,7 +64,12 @@ class PersonalFinancesApp
             ).ToList();
 
         // Output all transactions
-        _transactionUserInteraction.OutputTransactions(monthlyTransactions, "Last Month's Transactions", null);
+        List<Transaction> spendingTransactions = monthlyTransactions.Where(transaction => {
+            return transaction.Vendor != "credit payment" &&
+            transaction.Vendor != "account transfer" &&
+            transaction.Category != "income";
+        }).ToList();
+        _transactionUserInteraction.OutputTransactions(spendingTransactions, "Last Month's Transactions", null);
 
         // Output by category
         foreach (string category in categories)
