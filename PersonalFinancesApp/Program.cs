@@ -1,10 +1,11 @@
 ﻿using PersonalFinances.Repositories;
 using PersonalFinances.App;
 
-string testTransactionsCsvPath = "";
-string vendersJsonPath = "./vendors.json";
-string categoriesJsonPath = "./categories.json";
-string BudgetProfilesJsonPath = "./budgetProfiles.json";
+string transactionsCsvPath = "";
+string vendersJsonPath = "";
+string categoriesJsonPath = "";
+string BudgetProfilesJsonPath = "";
+TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 
 var FinancesApp = new PersonalFinancesApp(
@@ -21,4 +22,4 @@ var FinancesApp = new PersonalFinancesApp(
         TransactionsConsoleUserInteraction)
 );
 
-FinancesApp.Run(testTransactionsCsvPath);
+FinancesApp.Run(transactionsCsvPath, transactionRange);

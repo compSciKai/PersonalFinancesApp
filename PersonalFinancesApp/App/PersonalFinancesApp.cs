@@ -25,7 +25,7 @@ class PersonalFinancesApp
         _budgetService = budgetService;
     }
 
-    public void Run(string transactionsFilePath)
+    public void Run(string transactionsFilePath, TransactionFilterService.TransactionRange? transactionFilterString)
     {
         Console.WriteLine("Finances App Initialized\n");
         List<string> categories = _categoriesService.GetAllCategories();
@@ -54,60 +54,19 @@ class PersonalFinancesApp
         List<Transaction> rawTransactions = _transactionRepository.GetTransactions(transactionsFilePath);
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
+        List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
+        List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
+        
+        string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
+        string tableName = rangeType is not null ? $"{rangeType}'s Transactions" : "Transactions";
+        _transactionUserInteraction.OutputTransactions(spendingTransactions, tableName, null);
 
-        // TODO: create enums for date ranges. Create date filter class -> pass in transactions
-        DateTime lastMonthEnd = LastDayOfLastMonth();
-        DateTime lastMonthStart = FirstDayOfLastMonth();
-        List<Transaction> monthlyTransactions = transactionsWithCategories.Where(
-            // transaction => transaction.Date > lastMonthStart && transaction.Date < lastMonthEnd
-            transaction => transaction.Date > lastMonthEnd
-            ).ToList();
-
-        // Output all transactions
-        List<Transaction> spendingTransactions = monthlyTransactions.Where(transaction => {
-            return transaction.Vendor != "credit payment" &&
-            transaction.Vendor != "account transfer" &&
-            transaction.Category != "income";
-        }).ToList();
-        _transactionUserInteraction.OutputTransactions(spendingTransactions, "Last Month's Transactions", null);
-
-        // Output by category
         foreach (string category in categories)
         {
-            List<Transaction> categorizedTransactions = monthlyTransactions.Where(transaction => transaction.Category == category).ToList();
+            List<Transaction> categorizedTransactions = filteredTransactions.Where(transaction => transaction.Category == category).ToList();
             _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
         }
 
-        // Export to File
-        _transactionRepository.ExportTransactions(monthlyTransactions, "../../../../test-export.csv");
-    }
-
-    public void Run()
-    {
-        _transactionUserInteraction.ShowMessage("Please enter a path to your transactions:");
-        string transactionsPath = _transactionUserInteraction.GetInput();
-        Console.WriteLine($"Transaction path is {transactionsPath}");
-
-        _transactionUserInteraction.ShowMessage("Please enter a path to your list of saved vendors:");
-        string vendorsPath = _transactionUserInteraction.GetInput();
-        Console.WriteLine($"Vendors path is {vendorsPath}");
-
-        // TODO: complete method call this(transactionPath?)
-    }
-
-    private DateTime LastDayOfLastMonth() 
-    {
-        DateTime firstDayofThisMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0);
-        return firstDayofThisMonth.AddSeconds(-1);
-    }
-    
-    private DateTime FirstDayOfThisMonth() 
-    {
-        return new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0);
-    }
-
-    private DateTime FirstDayOfLastMonth()
-    {
-        return new DateTime(DateTime.Now.Year, DateTime.Now.Month - 1, 1, 0, 0, 0);
+        _transactionRepository.ExportTransactions(filteredTransactions, "");
     }
 }
