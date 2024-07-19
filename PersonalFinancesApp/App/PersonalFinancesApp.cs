@@ -25,17 +25,22 @@ class PersonalFinancesApp
         _budgetService = budgetService;
     }
 
-    public void Run(string transactionsFilePath, TransactionFilterService.TransactionRange? transactionFilterString)
+    public void Run(string transactionsFilePath, TransactionFilterService.TransactionRange? transactionFilterString, string? currentProfile)
     {
         Console.WriteLine("Finances App Initialized\n");
         List<string> categories = _categoriesService.GetAllCategories();
 
-        BudgetProfile? profile = _budgetService.GetActiveProfile();
-        if (profile is null)
+        BudgetProfile? profile = _budgetService.GetProfile(currentProfile);
+        if (profile is null) 
         {
-            _transactionUserInteraction.ShowMessage("No budget profiles found. Creating first profile...");
-            profile = _budgetService.CreateNewProfile();
+            profile = _budgetService.GetActiveProfile();
+            if (profile is null)
+            {
+                _transactionUserInteraction.ShowMessage("No budget profiles found. Creating first profile...");
+                profile = _budgetService.CreateNewProfile();
+            }
         }
+
 
         double budgetTotal = _budgetService.GetBudgetTotal(profile);
 

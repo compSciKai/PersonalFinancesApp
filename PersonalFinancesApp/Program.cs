@@ -5,7 +5,10 @@ string transactionsCsvPath = "";
 string vendersJsonPath = "";
 string categoriesJsonPath = "";
 string BudgetProfilesJsonPath = "";
+string currentProfile = "";
+
 TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
+
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 
 var FinancesApp = new PersonalFinancesApp(
@@ -22,4 +25,4 @@ var FinancesApp = new PersonalFinancesApp(
         TransactionsConsoleUserInteraction)
 );
 
-FinancesApp.Run(transactionsCsvPath, transactionRange);
+FinancesApp.Run(transactionsCsvPath, transactionRange, currentProfile);
