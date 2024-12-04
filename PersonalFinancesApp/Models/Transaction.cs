@@ -13,7 +13,7 @@ public class Transaction {
     [Name("Transaction Date")]
     public DateTime Date { get; set; }
     [Name("CAD$")]
-    public double Amount { get; set; }    
+    public decimal Amount { get; set; }    
     [Name("Description 1")]
     public string Description1 { get; set; }
     [Name("Description 2")]

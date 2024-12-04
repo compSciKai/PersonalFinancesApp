@@ -40,7 +40,7 @@ Transaction testTransaction = new Transaction()
     AccountType = "credit",
     AccountNumber = "05",
     Date = DateTime.Now,
-    Amount = 50.05f,
+    Amount = 50.05m,
     Description1 = "This is a test"
 };
 
