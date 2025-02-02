@@ -21,7 +21,7 @@ public class CategoriesService : ICategoriesService
     {
         foreach (var kvp in CategoriesMap)
         {
-            if (vendor.ToLower().Contains(kvp.Key.ToLower()))
+            if (vendor is not null && vendor.ToLower().Contains(kvp.Key.ToLower()))
             {
                 return kvp.Value.ToLower();
             }

@@ -23,7 +23,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     public void Exit() 
     {
         Console.WriteLine("Press any key to exit.");
-        Console.ReadKey();
+        Console.Read();
         System.Environment.Exit(1);
     }
 
@@ -76,16 +76,15 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
         for (int i = 0; i < transactions.Count(); i++)
         {
-            string vendor = transactions[i].Vendor.ToUpper();
-            string category = transactions[i].Category.ToUpper();
-
+            string vendor = transactions[i].Vendor ?? "";
+            string category = transactions[i].Category ?? "";
 
             DataRow row = table.NewRow();
             row["ID"] = i+1;
             row["Account Type"] = transactions[i].AccountType;
             row["Date"] = transactions[i].Date.ToShortDateString();
-            row["Vendor Name"] = vendor;
-            row["Category"] = category;
+            row["Vendor Name"] = vendor.ToUpper();
+            row["Category"] = category.ToUpper();
             row["Description"] = transactions[i].Description;
             row["Amount"] = transactions[i].Amount.ToString("0.00");
 

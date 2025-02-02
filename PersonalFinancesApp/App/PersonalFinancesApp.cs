@@ -56,6 +56,13 @@ class PersonalFinancesApp
             _transactionUserInteraction.Exit();
         }
 
+        // Validate transactionsFilePath
+        if (!File.Exists(transactionsFilePath))
+        {
+            _transactionUserInteraction.ShowMessage($"Error: Transactions could not be loaded. File {transactionsFilePath} does not exist.");
+            _transactionUserInteraction.Exit();
+        }
+
         List<Transaction> rawTransactions = _transactionRepository.GetTransactions(transactionsFilePath);
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
@@ -72,6 +79,6 @@ class PersonalFinancesApp
             _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
         }
 
-        _transactionRepository.ExportTransactions(filteredTransactions, "");
+        _transactionRepository.ExportTransactions(filteredTransactions, "../../../../test-export.csv");
     }
 }
