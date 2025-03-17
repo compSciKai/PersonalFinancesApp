@@ -8,3 +8,11 @@ bin
 [Rr]elease/
 *.obj
 *.pdb
+/.vs/PersonalFinancesApp
+transactions*
+budgetProfiles.json
+categories.json
+vendors.json
+/PersonalFinancesApp.Api/appsettings.json
+*.bak
+test*.csv
