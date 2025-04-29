@@ -76,7 +76,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
         for (int i = 0; i < transactions.Count(); i++)
         {
-            string vendor = transactions[i].Vendor.ToUpper();
+            string vendor = transactions[i].Vendor?.ToUpper();
             string category = transactions[i].Category.ToUpper();
 
 

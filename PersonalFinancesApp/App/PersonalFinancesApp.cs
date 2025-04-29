@@ -25,7 +25,7 @@ class PersonalFinancesApp
         _budgetService = budgetService;
     }
 
-    public void Run(string transactionsFilePath, TransactionFilterService.TransactionRange? transactionFilterString, string? currentProfile)
+    public void Run(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString, string? currentProfile)
     {
         Console.WriteLine("Finances App Initialized\n");
         List<string> categories = _categoriesService.GetAllCategories();
@@ -56,14 +56,34 @@ class PersonalFinancesApp
             _transactionUserInteraction.Exit();
         }
 
-        List<Transaction> rawTransactions = _transactionRepository.GetTransactions(transactionsFilePath);
+        List<Transaction> rawTransactions = new List<Transaction>();
+
+        foreach (var transactionEntry in transactionsDictionary)
+        {
+            if (transactionEntry.Value == typeof(RBCTransaction))
+            {
+                var transactions = _transactionRepository.GetTransactions<RBCTransaction>(transactionEntry.Key);
+                rawTransactions.AddRange(transactions);
+            }
+            else if (transactionEntry.Value == typeof(AmexTransaction))
+            {
+                var transactions = _transactionRepository.GetTransactions<AmexTransaction>(transactionEntry.Key);
+                rawTransactions.AddRange(transactions);
+            }
+            else
+            {
+                throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
+            } 
+        }
+
+        // construct list of transactions and handler dictionary, iterate over
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
         List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
         List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
         
         string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
-        string tableName = rangeType is not null ? $"{rangeType}'s Transactions" : "Transactions";
+        string tableName = rangeType is not null ? $"{rangeType} Transactions" : "Transactions";
         _transactionUserInteraction.OutputTransactions(spendingTransactions, tableName, null);
 
         foreach (string category in categories)
@@ -72,6 +92,6 @@ class PersonalFinancesApp
             _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
         }
 
-        _transactionRepository.ExportTransactions(filteredTransactions, "");
+        _transactionRepository.ExportTransactions(filteredTransactions, "./export-test.csv");
     }
 }

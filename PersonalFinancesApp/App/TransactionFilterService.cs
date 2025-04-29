@@ -11,10 +11,15 @@ public static class TransactionFilterService
             return transactions.Where(
                 transaction => transaction.Date > LastDayOfLastMonth()
             ).ToList();
-        } else if (filterString == TransactionRange.LastMonth) {
+        } 
+        else if (filterString == TransactionRange.LastMonth) {
             return transactions.Where(
                 transaction => transaction.Date > FirstDayOfLastMonth() && transaction.Date < LastDayOfLastMonth()
-            ).ToList();            
+            ).ToList();
+        }
+        else if (filterString == TransactionRange.All)
+        {
+            return transactions;
         }
 
         return transactions;
@@ -51,7 +56,9 @@ public static class TransactionFilterService
         [Description("Last Month")]
         LastMonth,
         [Description("Last Three Months")]
-        Last3Months
+        Last3Months,
+        [Description("All")]
+        All,
     }
 
     public static string GetHumanReadableTransactionRange(TransactionRange? value)
