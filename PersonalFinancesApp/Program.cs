@@ -1,13 +1,21 @@
 ﻿using PersonalFinances.Repositories;
 using PersonalFinances.App;
+using PersonalFinances.Models;
 
-string transactionsCsvPath = "";
+
 string vendersJsonPath = "";
 string categoriesJsonPath = "";
 string BudgetProfilesJsonPath = "";
 string currentProfile = "";
 
-TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
+// Transactions Paths
+var transactionsDictionary = new Dictionary<string, Type>
+{
+    { "", typeof(RBCTransaction) },
+    { "", typeof(AmexTransaction) } 
+};
+
+TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.All;
 
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 
@@ -25,4 +33,4 @@ var FinancesApp = new PersonalFinancesApp(
         TransactionsConsoleUserInteraction)
 );
 
-FinancesApp.Run(transactionsCsvPath, transactionRange, currentProfile);
+FinancesApp.Run(transactionsDictionary, transactionRange, currentProfile);

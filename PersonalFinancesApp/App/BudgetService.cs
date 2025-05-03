@@ -71,7 +71,10 @@ public class BudgetService : IBudgetService
     public BudgetProfile CreateNewProfile()
     {
         _transactionUserInteraction.ShowMessage("What is the name for this profile?");
-        string name = _transactionUserInteraction.GetInput();
+        string profileName = _transactionUserInteraction.GetInput();
+
+        _transactionUserInteraction.ShowMessage("Who is this profile for?");
+        string userName = _transactionUserInteraction.GetInput();
 
         _transactionUserInteraction.ShowMessage("Set a description for this profile, or press enter.\n");
         string description = _transactionUserInteraction.GetInput();
@@ -114,7 +117,7 @@ public class BudgetService : IBudgetService
             }
         }
 
-        BudgetProfile newBudgetProfile = new BudgetProfile(name, budgets, income, description);
+        BudgetProfile newBudgetProfile = new BudgetProfile(profileName, budgets, income, userName, description);
         StoreProfile(newBudgetProfile);
 
         return newBudgetProfile;

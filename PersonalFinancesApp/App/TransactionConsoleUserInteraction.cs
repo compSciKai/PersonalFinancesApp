@@ -74,20 +74,27 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         table = MakeTransactionsTable(tableName.ToUpper());
         table.Columns[0].SetShowColumnName(false);
 
-        for (int i = 0; i < transactions.Count(); i++)
+        foreach (var transaction in transactions)
         {
-            string vendor = transactions[i].Vendor.ToUpper();
-            string category = transactions[i].Category.ToUpper();
-
+            string? vendor = transaction.Vendor?.ToUpper();
+            string? category = transaction.Category?.ToUpper();
 
             DataRow row = table.NewRow();
-            row["ID"] = i+1;
-            row["Account Type"] = transactions[i].AccountType;
-            row["Date"] = transactions[i].Date.ToShortDateString();
+            row["ID"] = transactions.IndexOf(transaction) + 1;
+            row["Account Type"] = transaction.AccountType;
+            row["Date"] = transaction.Date.ToShortDateString();
             row["Vendor Name"] = vendor;
             row["Category"] = category;
-            row["Description"] = transactions[i].Description;
-            row["Amount"] = transactions[i].Amount.ToString("0.00");
+            row["Description"] = transaction.Description;
+
+            if (!transaction.isNegativeAmounts)
+            {
+                row["Amount"] = (transaction.Amount * -1).ToString("0.00");
+            }
+            else
+            {
+                row["Amount"] = transaction.Amount.ToString("0.00");
+            }
 
             table.Rows.Add(row);
         }
