@@ -35,6 +35,7 @@ public static class TransactionFilterService
         return transactions.Where(transaction => transaction.MemberName.ToLower().Contains(userName.ToLower()) || transaction.MemberName == string.Empty).ToList();
     }
 
+    // TODO: fix as student loan being removed
     public static List<Transaction> GetSpendingTransactions(List<Transaction> transactions) {
         return transactions.Where(transaction => {
             return transaction.Vendor != "credit payment" &&

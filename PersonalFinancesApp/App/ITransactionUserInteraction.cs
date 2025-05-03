@@ -10,4 +10,5 @@ public interface ITransactionsUserInteraction
     KeyValuePair<string, string>? PromptForVendorKVP(string transactionData);
     KeyValuePair<string, string>? PromptForCategoryKVP(string description);
     string? PromptForProfileChoice(List<string> profileNames);
+    void OutputBudgetVsActual(List<Transaction> transactions, BudgetProfile? profile);
 }
