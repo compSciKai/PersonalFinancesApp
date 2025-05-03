@@ -40,7 +40,7 @@ class PersonalFinancesApp
                 profile = _budgetService.CreateNewProfile();
             }
         }
-
+         
 
         double budgetTotal = _budgetService.GetBudgetTotal(profile);
 
@@ -70,6 +70,11 @@ class PersonalFinancesApp
                 var transactions = _transactionRepository.GetTransactions<AmexTransaction>(transactionEntry.Key);
                 rawTransactions.AddRange(transactions);
             }
+            else if (transactionEntry.Value == typeof(PCFinancialTransaction))
+            {
+                var transactions = _transactionRepository.GetTransactions<PCFinancialTransaction>(transactionEntry.Key);
+                rawTransactions.AddRange(transactions);
+            }
             else
             {
                 throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
@@ -80,6 +85,12 @@ class PersonalFinancesApp
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
         List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
+
+        if (profile.UserName != null)
+        {
+            filteredTransactions = TransactionFilterService.GetTransactionsForUser(filteredTransactions, profile.UserName);
+        }
+        
         List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
         
         string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);

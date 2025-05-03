@@ -25,6 +25,16 @@ public static class TransactionFilterService
         return transactions;
     }
 
+    public static List<Transaction> GetTransactionsForUser(List<Transaction> transactions, string userName)
+    {
+        if (string.IsNullOrEmpty(userName))
+        {
+            return transactions;
+        }
+
+        return transactions.Where(transaction => transaction.MemberName.ToLower().Contains(userName.ToLower()) || transaction.MemberName == string.Empty).ToList();
+    }
+
     public static List<Transaction> GetSpendingTransactions(List<Transaction> transactions) {
         return transactions.Where(transaction => {
             return transaction.Vendor != "credit payment" &&
