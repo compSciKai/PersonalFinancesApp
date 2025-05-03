@@ -90,7 +90,9 @@ class PersonalFinancesApp
         {
             filteredTransactions = TransactionFilterService.GetTransactionsForUser(filteredTransactions, profile.UserName);
         }
-        
+
+        filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
+
         List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
         
         string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
@@ -100,9 +102,25 @@ class PersonalFinancesApp
         foreach (string category in categories)
         {
             List<Transaction> categorizedTransactions = filteredTransactions.Where(transaction => transaction.Category == category).ToList();
-            _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
+
+            if (profile.BudgetCategories.Any(c => c.Key.ToLower() == category.ToLower()))
+            {
+                _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
+            }
         }
 
+        // Output Budget Vs Actual Spending Totals
+        _transactionUserInteraction.OutputBudgetVsActual(filteredTransactions, profile);
+
+        /* TODO:
+        - [ ] Fix transfers
+        - [ ] Fix Create table for other transactions
+        - [ ] create method to find specific trnansactions via name and amount to categorize as, rent, student loan, etc -- take one
+        - [ ] create total expense vs diff
+        - [ ] aim to get caluclates to become exact
+        - [ ] in budget vs actual, determine unaccounted for transactions, ie. missing student loan etc
+
+        */
         _transactionRepository.ExportTransactions(filteredTransactions, "./export-test.csv");
     }
 }
