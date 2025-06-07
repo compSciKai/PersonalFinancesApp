@@ -9,4 +9,5 @@ public interface ICategoriesService
     void StoreNewCategory(string key, string categoryName);
     void StoreNewCategories(Dictionary<string, string> categoryDictionary);
     List<Transaction> AddCategoriesToTransactions(List<Transaction> transactions);
+    List<Transaction> OverrideCategories(List<Transaction> transactions, string categoryToOverride, string newCategory);
 }
