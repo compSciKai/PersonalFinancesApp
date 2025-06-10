@@ -1,4 +1,6 @@
 using System.Text.Json;
+using PersonalFinances.Models;
+
 namespace PersonalFinances.Repositories;
 
 public class BudgetRepository : IBudgetRepository

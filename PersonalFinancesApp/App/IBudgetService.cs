@@ -1,3 +1,5 @@
+using PersonalFinances.Models;
+
 namespace PersonalFinances.App;
 
 public interface IBudgetService

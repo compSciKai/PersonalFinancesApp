@@ -1,3 +1,5 @@
+using PersonalFinances.Models;
+
 namespace PersonalFinances.Repositories;
 
 public interface IBudgetRepository
