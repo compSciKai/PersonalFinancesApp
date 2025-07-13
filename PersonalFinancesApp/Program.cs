@@ -1,11 +1,17 @@
 ﻿using PersonalFinances.Repositories;
 using PersonalFinances.App;
 
-string transactionsCsvPath = "";
+
 string vendersJsonPath = "";
 string categoriesJsonPath = "";
 string BudgetProfilesJsonPath = "";
 string currentProfile = "";
+
+// Transactions Paths
+var transactionsDictionary = new Dictionary<string, Type>
+{
+    {"path/transactions.csv", typeof(Transaction) }
+};
 
 TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
 
@@ -25,4 +31,4 @@ var FinancesApp = new PersonalFinancesApp(
         TransactionsConsoleUserInteraction)
 );
 
-FinancesApp.Run(transactionsCsvPath, transactionRange, currentProfile);
+FinancesApp.Run(transactionsDictionary, transactionRange, currentProfile);
