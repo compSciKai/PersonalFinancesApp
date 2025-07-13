@@ -8,3 +8,12 @@ bin
 [Rr]elease/
 *.obj
 *.pdb
+/.vs/
+transactions*
+*.bak
+test*.csv
+vendors.json
+appsettings.json
+budgetProfiles.json
+categories.json
+vendors.json

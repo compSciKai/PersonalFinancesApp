@@ -11,15 +11,31 @@ public static class TransactionFilterService
             return transactions.Where(
                 transaction => transaction.Date > LastDayOfLastMonth()
             ).ToList();
-        } else if (filterString == TransactionRange.LastMonth) {
+        } 
+        else if (filterString == TransactionRange.LastMonth) {
             return transactions.Where(
                 transaction => transaction.Date > FirstDayOfLastMonth() && transaction.Date < LastDayOfLastMonth()
-            ).ToList();            
+            ).ToList();
+        }
+        else if (filterString == TransactionRange.All)
+        {
+            return transactions;
         }
 
         return transactions;
     }
 
+    public static List<Transaction> GetTransactionsForUser(List<Transaction> transactions, string userName)
+    {
+        if (string.IsNullOrEmpty(userName))
+        {
+            return transactions;
+        }
+
+        return transactions.Where(transaction => transaction.MemberName.ToLower().Contains(userName.ToLower()) || transaction.MemberName == string.Empty).ToList();
+    }
+
+    // TODO: fix as student loan being removed
     public static List<Transaction> GetSpendingTransactions(List<Transaction> transactions) {
         return transactions.Where(transaction => {
             return transaction.Vendor != "credit payment" &&
@@ -51,7 +67,9 @@ public static class TransactionFilterService
         [Description("Last Month")]
         LastMonth,
         [Description("Last Three Months")]
-        Last3Months
+        Last3Months,
+        [Description("All")]
+        All,
     }
 
     public static string GetHumanReadableTransactionRange(TransactionRange? value)

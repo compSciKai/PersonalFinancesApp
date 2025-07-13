@@ -70,27 +70,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     {
         // source: https://learn.microsoft.com/en-us/dotnet/api/system.data.datarow?view=net-8.0
 
-        DataTable table;
-        table = MakeTransactionsTable(tableName.ToUpper());
-        table.Columns[0].SetShowColumnName(false);
-
-        for (int i = 0; i < transactions.Count(); i++)
-        {
-            string vendor = transactions[i].Vendor.ToUpper();
-            string category = transactions[i].Category.ToUpper();
-
-
-            DataRow row = table.NewRow();
-            row["ID"] = i+1;
-            row["Account Type"] = transactions[i].AccountType;
-            row["Date"] = transactions[i].Date.ToShortDateString();
-            row["Vendor Name"] = vendor;
-            row["Category"] = category;
-            row["Description"] = transactions[i].Description;
-            row["Amount"] = transactions[i].Amount.ToString("0.00");
-
-            table.Rows.Add(row);
-        }
+        DataTable table = GenerateTransactionsTable(transactions, tableName);
 
         decimal totalExpenses = table.AsEnumerable().Sum(row => row.Field<decimal>("Amount"));
 
@@ -99,7 +79,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         subtotalsRow["Amount"] = totalExpenses;
         subtotalsRow["Vendor Name"] = "";
         subtotalsRow["Category"] = "";
-        
+
         DataRow dividerRow = table.NewRow();
         dividerRow["Category"] = "";
         dividerRow["Vendor Name"] = "";
@@ -107,6 +87,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         table.Rows.Add(dividerRow);
         table.Rows.Add(subtotalsRow);
 
+        // TODO: move to method -- calculate budget
         if (profile is not null && profile.BudgetCategories.ContainsKey(tableName))
         {
             decimal limit = (decimal)profile.BudgetCategories[tableName];
@@ -135,6 +116,39 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         Console.WriteLine(table.ToPrettyPrintedString());
     }
 
+    private DataTable GenerateTransactionsTable(List<Transaction> transactions, string tableName)
+    {
+        DataTable table = MakeTransactionsTable(tableName.ToUpper());
+        table.Columns[0].SetShowColumnName(false);
+
+        foreach (var transaction in transactions)
+        {
+            string? vendor = transaction.Vendor?.ToUpper();
+            string? category = transaction.Category?.ToUpper();
+
+            DataRow row = table.NewRow();
+            row["ID"] = transactions.IndexOf(transaction) + 1;
+            row["Account Type"] = transaction.AccountType;
+            row["Date"] = transaction.Date.ToShortDateString();
+            row["Vendor Name"] = vendor;
+            row["Category"] = category;
+            row["Description"] = transaction.Description;
+
+            if (!transaction.isNegativeAmounts)
+            {
+                row["Amount"] = (transaction.Amount * -1).ToString("0.00");
+            }
+            else
+            {
+                row["Amount"] = transaction.Amount.ToString("0.00");
+            }
+
+            table.Rows.Add(row);
+        }
+
+        return table;
+    }
+
     private void FormatTableWidths(DataTable table)
     {
         table.Columns[0].SetWidth(4);
@@ -144,44 +158,6 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         table.Columns[4].SetWidth(18);
         table.Columns[5].SetWidth(42);
         table.Columns[6].SetWidth(11);
-
-
-
-
-    }
-
-    private DataTable MakeSubtotalsTable()
-    {
-        // source: https://learn.microsoft.com/en-us/dotnet/api/system.data.datarow?view=net-8.0
-
-        // Create a new DataTable titled 'Transactions.'
-        DataTable subtotalsTable = new DataTable("Subtotals");
-
-        // Add column objects to the table.
-        DataColumn idColumn = new  DataColumn();
-        idColumn.DataType = System.Type.GetType("System.Int32");
-        idColumn.ColumnName = "ID";
-        idColumn.AutoIncrement = true;
-        subtotalsTable.Columns.Add(idColumn);
-
-        DataColumn typeColumn = new  DataColumn();
-        typeColumn.DataType = System.Type.GetType("System.String");
-        typeColumn.ColumnName = "Type";
-        subtotalsTable.Columns.Add(typeColumn);
-
-        DataColumn amountColumn = new DataColumn();
-        amountColumn.DataType = System.Type.GetType("System.Decimal");
-        amountColumn.ColumnName = "Amount";
-        amountColumn.SetDataAlignment(TextAlignment.Right);
-        subtotalsTable.Columns.Add(amountColumn);
-
-        // Create an array for DataColumn objects.
-        DataColumn [] keys = new DataColumn [1];
-        keys[0] = idColumn;
-        subtotalsTable.PrimaryKey = keys;
-
-        // Return the new DataTable.
-        return subtotalsTable;
     }
 
     private DataTable MakeTransactionsTable(string tableName)
@@ -318,5 +294,54 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         }
 
         return new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower());
+    }
+    public void OutputBudgetVsActual(List<Transaction> transactions, BudgetProfile? profile)
+    {
+        DataTable table = GenerateTransactionsTable(transactions, "Budget vs Actual");
+
+        if (profile == null)
+        {
+            ShowMessage("No budget profile provided. Cannot calculate budget vs actual.");
+            return;
+        }
+
+        // Create the final table with required columns
+        DataTable finalTable = new DataTable("Budget vs Actual");
+        finalTable.Columns.Add("Category", typeof(string));
+        finalTable.Columns.Add("Budgeted", typeof(decimal));
+        finalTable.Columns.Add("Actual", typeof(decimal));
+        finalTable.Columns.Add("Difference", typeof(decimal));
+
+        // Calculate actual amounts from the input table
+        var actualAmounts = table.AsEnumerable()
+            .Where(row => row["Category"] is not DBNull && row["Amount"] is not DBNull)
+            .GroupBy(row => row["Category"].ToString().ToLower())
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(row => Convert.ToDecimal(row["Amount"]))
+            );
+
+        // Populate the final table
+        foreach (var budgetCategory in profile.BudgetCategories)
+        {
+            string category = budgetCategory.Key;
+            decimal budgeted = (decimal)budgetCategory.Value;
+            decimal actual = actualAmounts.ContainsKey(category) ? actualAmounts[category] : 0;
+            decimal difference = budgeted + actual; // actual in negative figure
+
+            DataRow row = finalTable.NewRow();
+            row["Category"] = category;
+            row["Budgeted"] = budgeted;
+            row["Actual"] = actual;
+            row["Difference"] = difference;
+            finalTable.Rows.Add(row);
+        }
+
+        // Format and print the final table
+        finalTable.SetTitleTextAlignment(TextAlignment.Left);
+        finalTable.Columns["Actual"].SetDataAlignment(TextAlignment.Right);
+        finalTable.Columns["Difference"].SetDataAlignment(TextAlignment.Right);
+
+        Console.WriteLine(finalTable.ToPrettyPrintedString());
     }
 }

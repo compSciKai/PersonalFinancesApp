@@ -1,17 +1,24 @@
-﻿using PersonalFinances.Repositories;
-using PersonalFinances.App;
-using PersonalFinances.Models;
-using PersonalFinances.Data;
-
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Internal;
+using Microsoft.Extensions.Options;
+using PersonalFinances.App;
+using PersonalFinances.Data;
+using PersonalFinances.Models;
+using PersonalFinances.Repositories;
+using System;
+using System.Collections.Generic;
 
-//string transactionsCsvPath = "";
 //string vendersJsonPath = "";
 //string categoriesJsonPath = "";
 //string BudgetProfilesJsonPath = "";
 //string currentProfile = "";
+
+// Transactions Paths
+//var transactionsDictionary = new Dictionary<string, Type>
+//{
+//    { "", typeof(RBCTransaction) },
+//    { "", typeof(AmexTransaction) }
+//};
 
 //TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
 
@@ -44,6 +51,9 @@ Transaction testTransaction = new Transaction()
     Description1 = "This is a test"
 };
 
+
+
+TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.All;
 entities.Add(testTransaction);
 entities.SaveChanges();
 
@@ -54,3 +64,4 @@ foreach (Transaction transaction in transactions)
     Console.WriteLine(transaction.Description1);
 }
 
+//FinancesApp.Run(transactionsDictionary, transactionRange, currentProfile);

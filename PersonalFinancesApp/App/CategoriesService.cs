@@ -4,7 +4,7 @@ namespace PersonalFinances.App;
 
 public class CategoriesService : ICategoriesService
 {
-    Dictionary<string, string> CategoriesMap {get; set;}
+    public Dictionary<string, string> CategoriesMap { get; private set; }
     ICategoriesRepository _categoriesRepository;
     ITransactionsUserInteraction _transactionUserInteraction;
 
@@ -21,7 +21,7 @@ public class CategoriesService : ICategoriesService
     {
         foreach (var kvp in CategoriesMap)
         {
-            if (vendor.ToLower().Contains(kvp.Key.ToLower()))
+            if (vendor != null && vendor.ToLower().Contains(kvp.Key.ToLower()))
             {
                 return kvp.Value.ToLower();
             }
@@ -73,6 +73,23 @@ public class CategoriesService : ICategoriesService
                 }
 
                 transaction.Category = categoryName;
+            }
+        }
+
+        return transactions;
+    }
+
+    public List<Transaction> OverrideCategories(List<Transaction> transactions, string categoryToOverride, string newCategory)
+    {
+        foreach (var transaction in transactions)
+        {
+            if (transaction.Category is not null)
+            {
+                string? categoryName = transaction.Category;
+                if (!string.IsNullOrEmpty(categoryName) && categoryName.ToLower() == categoryToOverride.ToLower())
+                {
+                    transaction.Category = newCategory.ToLower();
+                }
             }
         }
 

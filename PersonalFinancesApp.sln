@@ -5,18 +5,32 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersonalFinancesApp", "PersonalFinancesApp\PersonalFinancesApp.csproj", "{1EC0710C-F75F-413D-8274-6BADF68F4DBB}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}"
+	ProjectSection(SolutionItems) = preProject
+		budgetProfiles.json = budgetProfiles.json
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersonalFinancesAppTests", "PersonalFinancesAppTests\PersonalFinancesAppTests.csproj", "{160E3E4B-83B2-43C1-A1BA-03F9BE12383A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{1EC0710C-F75F-413D-8274-6BADF68F4DBB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1EC0710C-F75F-413D-8274-6BADF68F4DBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1EC0710C-F75F-413D-8274-6BADF68F4DBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1EC0710C-F75F-413D-8274-6BADF68F4DBB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{160E3E4B-83B2-43C1-A1BA-03F9BE12383A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{160E3E4B-83B2-43C1-A1BA-03F9BE12383A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{160E3E4B-83B2-43C1-A1BA-03F9BE12383A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{160E3E4B-83B2-43C1-A1BA-03F9BE12383A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {10260B94-928E-439F-9076-B178F28E8137}
 	EndGlobalSection
 EndGlobal
