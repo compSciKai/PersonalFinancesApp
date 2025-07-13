@@ -1,11 +1,12 @@
 using System.Numerics;
 using PersonalFinances.Repositories;
+using PersonalFinances.Models;
 
 namespace PersonalFinances.App;
 
 public class BudgetService : IBudgetService
 {
-    List<BudgetProfile> BudgetProfiles {get; set;}
+    public List<BudgetProfile> BudgetProfiles {get; private set;}
     IBudgetRepository _budgetRepository;
     ITransactionsUserInteraction _transactionUserInteraction;
 
@@ -22,8 +23,16 @@ public class BudgetService : IBudgetService
         return BudgetProfiles.Find(profile => profile.Name == profileName);
     }
 
+
     public void StoreProfile(BudgetProfile profile)
     {
+        if (GetProfile(profile.Name) is not null)
+        {
+            _transactionUserInteraction.ShowMessage($"Profile with name {profile.Name} already exists.");
+
+            return;
+        }
+
         BudgetProfiles.Add(profile);
         _budgetRepository.SaveBudgetProfiles(BudgetProfiles);
     }

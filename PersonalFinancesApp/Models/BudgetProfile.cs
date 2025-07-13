@@ -1,4 +1,7 @@
 using PersonalFinances.Extentions;
+
+namespace PersonalFinances.Models;
+
 public class BudgetProfile
 {
     public string Name { get; set; }

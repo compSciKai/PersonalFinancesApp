@@ -4,7 +4,7 @@ namespace PersonalFinances.App;
 
 public class CategoriesService : ICategoriesService
 {
-    Dictionary<string, string> CategoriesMap { get; set; }
+    public Dictionary<string, string> CategoriesMap { get; private set; }
     ICategoriesRepository _categoriesRepository;
     ITransactionsUserInteraction _transactionUserInteraction;
 
