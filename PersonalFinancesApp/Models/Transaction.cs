@@ -2,16 +2,22 @@ using CsvHelper.Configuration.Attributes;
 using System.ComponentModel.DataAnnotations;
 namespace PersonalFinances.Models;
 
-// TODO: Make transaction abstract class and RBCBanking derived class
 
+public abstract class BaseEntity
+{
+    public int Id { get; set; }
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedDate { get; set; }
+}
 
-public abstract class Transaction
+public abstract class Transaction : BaseEntity
 {
     public string? Category { get; set; }
     public string? Vendor { get; set; }
     public virtual DateTime Date { get; set; }
     public virtual string Description { get; set; }
-    public virtual float Amount { get; set; }
+    [Required]
+    public virtual decimal Amount { get; set; }
     public virtual string AccountType { get; set; }
     public virtual string MemberName { get; set; } = string.Empty;
     public virtual bool isNegativeAmounts { get; } = true;
@@ -19,11 +25,11 @@ public abstract class Transaction
 
 public class RBCTransaction : Transaction {
     [Name("Account Type")]
-    public override string AccountType { get; set; }
+    public override string AccountType { get; set; } = "RBC";
     [Name("Transaction Date")]
     public override DateTime Date { get; set; }
     [Name("CAD$")]
-    public override float Amount { get; set; }
+    public override decimal Amount { get; set; }
     [Name("Description 1")]
     public string Description1 { get; set; }
     [Name("Description 2")]
@@ -45,7 +51,7 @@ public class AmexTransaction : Transaction
     [Name("Date Processed")]
     public DateTime ProcessedDate { get; set; }
     [Name("Amount")]
-    public override float Amount { get; set; }
+    public override decimal Amount { get; set; }
     [Name("Description")]
     public override string Description { get; set; }
     [Name("Account #")]
@@ -63,7 +69,7 @@ public class PCFinancialTransaction : Transaction
     [Name("Description")]
     public override string Description { get; set; }
     [Name("Amount")]
-    public override float Amount { get; set; }
+    public override decimal Amount { get; set; }
     [Name("Card Holder Name")]
     public override string MemberName { get; set; }
     [Name("Type")]

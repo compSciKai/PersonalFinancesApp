@@ -42,26 +42,38 @@ using System.Collections.Generic;
 
 TransactionContext entities = new TransactionContext();
 
-Transaction testTransaction = new Transaction()
+Transaction testTransaction = new RBCTransaction()
 {
-    AccountType = "credit",
-    AccountNumber = "05",
+    AccountType = "RBC",
+    Description1 = "Test.",
     Date = DateTime.Now,
     Amount = 50.05m,
-    Description1 = "This is a test"
+    Description2 = "This is a test"
 };
 
 
+using (var context = new TransactionContext())
+{
+    bool canConnect = context.Database.CanConnect();
+    Console.WriteLine($"Can connect: {canConnect}");
 
-TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.All;
+    if (canConnect)
+    {
+        // Try to ensure database is created
+        context.Database.EnsureDeleted();
+        context.Database.EnsureCreated();
+    }
+}
+
+
 entities.Add(testTransaction);
 entities.SaveChanges();
 
-IEnumerable<Transaction> transactions = entities.TransactionItem.ToList<Transaction>();
+IEnumerable<Transaction> transactions = entities.Transactions.ToList<Transaction>();
 
 foreach (Transaction transaction in transactions)
 {
-    Console.WriteLine(transaction.Description1);
+    Console.WriteLine(transaction.Description);
 }
 
 //FinancesApp.Run(transactionsDictionary, transactionRange, currentProfile);
