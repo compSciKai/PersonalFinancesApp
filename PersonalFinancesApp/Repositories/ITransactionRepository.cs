@@ -2,7 +2,7 @@ using PersonalFinances.Models;
 
 namespace PersonalFinances.Repositories;
 
-public interface ITransactionsRepository
+public interface ITransactionsRepository : ITransactionSavable
 {
     List<T> GetTransactions<T>(string filePath);
     void ExportTransactions(List<Transaction> transactions, string filePath);

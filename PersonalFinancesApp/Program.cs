@@ -8,72 +8,97 @@ using PersonalFinances.Repositories;
 using System;
 using System.Collections.Generic;
 
-//string vendersJsonPath = "";
-//string categoriesJsonPath = "";
-//string BudgetProfilesJsonPath = "";
-//string currentProfile = "";
+string vendersJsonPath = "";
+string categoriesJsonPath = "";
+string BudgetProfilesJsonPath = "";
+string currentProfile = "";
 
 // Transactions Paths
-//var transactionsDictionary = new Dictionary<string, Type>
-//{
-//    { "", typeof(RBCTransaction) },
-//    { "", typeof(AmexTransaction) }
-//};
-
-//TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
-
-//var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
-
-//var FinancesApp = new PersonalFinancesApp(
-//    new CsvTransactionRepository(),
-//    TransactionsConsoleUserInteraction,
-//    new VendorsService(
-//        new VendorsRepository(vendersJsonPath),
-//        TransactionsConsoleUserInteraction),
-//    new CategoriesService(
-//        new CategoriesRepository(categoriesJsonPath),
-//        TransactionsConsoleUserInteraction),
-//    new BudgetService(
-//        new BudgetRepository(BudgetProfilesJsonPath),
-//        TransactionsConsoleUserInteraction)
-//);
-
-//FinancesApp.Run(transactionsCsvPath, transactionRange, currentProfile);
-
-TransactionContext entities = new TransactionContext();
-
-Transaction testTransaction = new RBCTransaction()
+var transactionsDictionary = new Dictionary<string, Type>
 {
-    AccountType = "RBC",
-    Description1 = "Test.",
-    Date = DateTime.Now,
-    Amount = 50.05m,
-    Description2 = "This is a test"
+    { "", typeof(RBCTransaction) },
+    { "", typeof(AmexTransaction) }
 };
 
+TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
 
-using (var context = new TransactionContext())
-{
-    bool canConnect = context.Database.CanConnect();
-    Console.WriteLine($"Can connect: {canConnect}");
+var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
+var entities = new TransactionContext();
 
-    if (canConnect)
-    {
-        // Try to ensure database is created
-        context.Database.EnsureDeleted();
-        context.Database.EnsureCreated();
-    }
-}
+var FinancesApp = new PersonalFinancesApp(
+    new CsvTransactionRepository(),
+    new SqlServerTransactionRepository(entities),
+    TransactionsConsoleUserInteraction,
+    new VendorsService(
+        new VendorsRepository(vendersJsonPath),
+        TransactionsConsoleUserInteraction),
+    new CategoriesService(
+        new CategoriesRepository(categoriesJsonPath),
+        TransactionsConsoleUserInteraction),
+    new BudgetService(
+        new BudgetRepository(BudgetProfilesJsonPath),
+        TransactionsConsoleUserInteraction)
+);
+
+//if (string.IsNullOrEmpty(currentProfile))
+//{
+//    Console.WriteLine("No current profile specified. Please specifiy one before continuing");
+//}
+
+FinancesApp.Run(transactionsDictionary, transactionRange, currentProfile);
+
+//TransactionContext entities = new TransactionContext();
+
+//Transaction rbcTestTransaction = new RBCTransaction()
+//{
+//    Description = "Test.",
+//    Date = DateTime.Now,
+//    Amount = 50.05m,
+//};
+
+//Transaction amexTestTransaction = new AmexTransaction()
+//{
+//    Description = "Test.",
+//    Date = DateTime.Now,
+//    Amount = 50.05m,
+//    AccountNumber = "123456",
+//    MemberName = "John Doe"
+//};
+
+//Transaction pcTestTransaction = new PCFinancialTransaction()
+//{
+//    Description = "Test.",
+//    Date = DateTime.Now,
+//    Amount = 50.05m,
+//    MemberName = "John Doe",
+//    TransactionType = "PC Financial"
+//};
+
+//using (var context = new TransactionContext())
+//{
+//    bool canConnect = context.Database.CanConnect();
+//    Console.WriteLine($"Can connect: {canConnect}");
+
+//    if (canConnect)
+//    {
+//        // Try to ensure database is created
+//        //context.Database.EnsureDeleted();
+//        context.Database.EnsureCreated();
+//        // ensure table created
+
+//    }
+//}
 
 
-entities.Add(testTransaction);
-entities.SaveChanges();
+//entities.Add(rbcTestTransaction);
+//entities.Add(amexTestTransaction);
+//entities.Add(pcTestTransaction);
+//entities.SaveChanges();
 
-IEnumerable<Transaction> transactions = entities.Transactions.ToList<Transaction>();
+//IEnumerable<Transaction> rbcTransactions = entities.RBCTransactions.ToList<Transaction>();
 
-foreach (Transaction transaction in transactions)
-{
-    Console.WriteLine(transaction.Description);
-}
+//foreach (Transaction transaction in rbcTransactions)
+//{
+//    Console.WriteLine(transaction.Description);
+//}
 
-//FinancesApp.Run(transactionsDictionary, transactionRange, currentProfile);

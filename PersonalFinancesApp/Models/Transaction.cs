@@ -21,6 +21,17 @@ public abstract class Transaction : BaseEntity
     public virtual string AccountType { get; set; }
     public virtual string MemberName { get; set; } = string.Empty;
     public virtual bool isNegativeAmounts { get; } = true;
+    public string TransactionHash { get; set; }
+
+    public virtual void GenerateHash()
+    {
+        var hashInput = $"{Date:yyyy-MM-dd}|{Amount}|{Description}|{AccountType}";
+        using (var sha256 = System.Security.Cryptography.SHA256.Create())
+        {
+            var hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(hashInput));
+            TransactionHash = Convert.ToBase64String(hashBytes);
+        }
+    }
 }
 
 public class RBCTransaction : Transaction {
@@ -31,17 +42,8 @@ public class RBCTransaction : Transaction {
     [Name("CAD$")]
     public override decimal Amount { get; set; }
     [Name("Description 1")]
-    public string Description1 { get; set; }
-    [Name("Description 2")]
-    public string Description2 { get; set; }
 
-    public override string Description
-    {
-        get
-        {
-            return $"{Description1} {Description2}".Trim();
-        }
-    }
+    public override string Description { get; set; }
 }
 
 public class AmexTransaction : Transaction

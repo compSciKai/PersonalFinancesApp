@@ -4,21 +4,24 @@ using PersonalFinances.Models;
 namespace PersonalFinances.App;
 class PersonalFinancesApp
 {
-    private readonly ITransactionsRepository _transactionRepository;
+    private readonly ITransactionsRepository _transactionCsvRepository;
+    private readonly ITransactionsRepository _transactionSqlRepository;
     private readonly ITransactionsUserInteraction _transactionUserInteraction;
     private readonly IVendorsService _vendorsService;
     private readonly ICategoriesService _categoriesService;
     private readonly IBudgetService _budgetService;
 
     public PersonalFinancesApp(
-        ITransactionsRepository transactionRepository, 
+        ITransactionsRepository transactionCsvRepository,
+        ITransactionsRepository transactionSqlRepository, 
         ITransactionsUserInteraction transactionUserInteraction,
         IVendorsService vendorsService,
         ICategoriesService categoriesService,
         IBudgetService budgetService
         )
     {
-        _transactionRepository = transactionRepository;
+        _transactionCsvRepository = transactionCsvRepository;
+        _transactionSqlRepository = transactionSqlRepository;
         _transactionUserInteraction = transactionUserInteraction;
         _vendorsService = vendorsService; 
         _categoriesService = categoriesService;
@@ -27,6 +30,7 @@ class PersonalFinancesApp
 
     public void Run(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString, string? currentProfile)
     {
+        // load data from sources
         Console.WriteLine("Finances App Initialized\n");
         List<string> categories = _categoriesService.GetAllCategories();
 
@@ -40,9 +44,10 @@ class PersonalFinancesApp
                 profile = _budgetService.CreateNewProfile();
             }
         }
-         
 
         double budgetTotal = _budgetService.GetBudgetTotal(profile);
+
+        // show profile info
 
         // TODO: output profile. Ask user if it is okay or would like to edit
         _transactionUserInteraction.ShowMessage($"Budget profile set to:\n");
@@ -56,33 +61,50 @@ class PersonalFinancesApp
             _transactionUserInteraction.Exit();
         }
 
-        List<Transaction> rawTransactions = new List<Transaction>();
+        // Get new transactions from CSV repository
+        List<Transaction> newTransactions = new List<Transaction>();
 
         foreach (var transactionEntry in transactionsDictionary)
         {
             if (transactionEntry.Value == typeof(RBCTransaction))
             {
-                var transactions = _transactionRepository.GetTransactions<RBCTransaction>(transactionEntry.Key);
-                rawTransactions.AddRange(transactions);
+                var transactions = _transactionCsvRepository.GetTransactions<RBCTransaction>(transactionEntry.Key);
+                newTransactions.AddRange(transactions);
             }
             else if (transactionEntry.Value == typeof(AmexTransaction))
             {
-                var transactions = _transactionRepository.GetTransactions<AmexTransaction>(transactionEntry.Key);
-                rawTransactions.AddRange(transactions);
+                var transactions = _transactionCsvRepository.GetTransactions<AmexTransaction>(transactionEntry.Key);
+                newTransactions.AddRange(transactions);
             }
             else if (transactionEntry.Value == typeof(PCFinancialTransaction))
             {
-                var transactions = _transactionRepository.GetTransactions<PCFinancialTransaction>(transactionEntry.Key);
-                rawTransactions.AddRange(transactions);
+                var transactions = _transactionCsvRepository.GetTransactions<PCFinancialTransaction>(transactionEntry.Key);
+                newTransactions.AddRange(transactions);
             }
             else
             {
                 throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
-            } 
+            }
         }
 
+        // save new transactions
+        _transactionSqlRepository.SaveTransactionsWithHashAsync(newTransactions);
+
+        // fetch all transactions
+        var allTransactions = _transactionSqlRepository.GetTransactions<Transaction>();
+
+        // process transactions if missing fields
+
+        // output information 
+
+
+
+
+
+
+
         // construct list of transactions and handler dictionary, iterate over
-        List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(rawTransactions);
+        List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(allTransactions);
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
         List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
 
@@ -121,6 +143,7 @@ class PersonalFinancesApp
         - [ ] in budget vs actual, determine unaccounted for transactions, ie. missing student loan etc
 
         */
-        _transactionRepository.ExportTransactions(filteredTransactions, "./export-test.csv");
+        //_transactionCsvRepository.ExportTransactions(filteredTransactions, "./export-test.csv");
+
     }
 }

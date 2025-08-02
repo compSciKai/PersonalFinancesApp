@@ -5,7 +5,9 @@ namespace PersonalFinances.Data;
 
 public class  TransactionContext : DbContext
 {
-    public DbSet<Transaction> Transactions { get; set; }
+    public DbSet<RBCTransaction> RBCTransactions { get; set; }
+    public DbSet<AmexTransaction> AmexTransactions { get; set; }
+    public DbSet<PCFinancialTransaction> PCTransactions { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
@@ -21,26 +23,26 @@ public class  TransactionContext : DbContext
     {
         modelBuilder.Entity<Transaction>(entity =>
         {
-            entity.HasDiscriminator<string>("AccountType")
-            .HasValue<RBCTransaction>("RBC")
-            .HasValue<AmexTransaction>("Amex")
-            .HasValue<PCFinancialTransaction>("PC Financial");
-
-            entity.Property(t => t.Amount)
-            .IsRequired();
+            entity.Property(t => t.TransactionHash).HasMaxLength(100);
+            entity.HasIndex(t => t.TransactionHash).IsUnique();
         });
 
         modelBuilder.Entity<RBCTransaction>(entity =>
         {
-            entity.Property(t => t.Description1)
-            .HasMaxLength(100);
-            entity.Property(t => t.Description2)
-            .HasMaxLength(100);
+            entity.ToTable("RBCTransactions");
+            entity.Property(t => t.Description).HasMaxLength(200).IsRequired();
+        });
 
-            // Make Description a computed column that EF ignores for inserts
-            entity.Property(t => t.Description)
-                .HasComputedColumnSql("CONCAT([Description1], ' ', [Description2])")
-                .ValueGeneratedOnAddOrUpdate();
+        modelBuilder.Entity<AmexTransaction>(entity =>
+        {
+            entity.ToTable("AmexTransactions");
+            entity.Property(t => t.Description).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<PCFinancialTransaction>(entity =>
+        {
+            entity.ToTable("PCFinancialTransactions");
+            entity.Property(t => t.Description).HasMaxLength(200).IsRequired();
         });
     }
 }
