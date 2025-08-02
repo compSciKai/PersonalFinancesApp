@@ -5,11 +5,11 @@ using CsvHelper.Configuration;
 
 namespace PersonalFinances.Repositories;
 
-public class CsvTransactionRepository : ITransactionsRepository
+public class CsvTransactionRepository<T> : IFileTransactionRepository<T> where T : Transaction
 {
 
 
-    public List<T> GetTransactions<T>(string filePath)
+    public async Task<List<T>> LoadFromFileAsync(string filePath)
     {
         if (!File.Exists(filePath))
         {
@@ -26,7 +26,7 @@ public class CsvTransactionRepository : ITransactionsRepository
         using (var csv = new CsvReader(reader, config))
         {
             // Read header to detect if this is an RBC CSV
-            csv.Read();
+            await csv.ReadAsync();
             csv.ReadHeader();
             var headers = csv.HeaderRecord;
 
@@ -38,12 +38,16 @@ public class CsvTransactionRepository : ITransactionsRepository
                 csv.Context.RegisterClassMap<RBCTransactionMap>();
             }
 
-            var transactionEnumerable = csv.GetRecords<T>();
-            return transactionEnumerable.ToList();
+            var transactions = new List<T>();
+            await foreach (var record in csv.GetRecordsAsync<T>())
+            {
+                transactions.Add(record);
+            }
+            return transactions;
         }
     }
 
-    public void ExportTransactions(List<Transaction> transactions, string filePath)
+    public async Task SaveToFileAsync(List<T> transactions, string filePath)
     {
         if (string.IsNullOrEmpty(filePath))
         {
@@ -53,13 +57,28 @@ public class CsvTransactionRepository : ITransactionsRepository
         using (var writer = new StreamWriter(filePath))
         using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
         {
-            csv.WriteRecords(transactions);
+            await csv.WriteRecordsAsync(transactions);
         }
     }
 
-    Task<int> ITransactionSavable.SaveTransactionsWithHashAsync<T>(List<T> transactions)
+    public async Task<List<T>> GetAllAsync()
     {
-        throw new NotImplementedException();
+        throw new NotSupportedException("CSV repository requires a file path. Use LoadFromFileAsync instead.");
+    }
+
+    public async Task<List<T>> GetByDateRangeAsync(DateTime start, DateTime end)
+    {
+        throw new NotSupportedException("CSV repository requires a file path. Use LoadFromFileAsync and filter the results.");
+    }
+
+    public async Task<int> SaveAsync(List<T> transactions)
+    {
+        throw new NotSupportedException("CSV repository requires a file path. Use SaveToFileAsync instead.");
+    }
+
+    public async Task<bool> ExistsAsync(string transactionHash)
+    {
+        throw new NotSupportedException("CSV repository cannot check existence without loading a file first.");
     }
 
     public class RBCTransactionMap : ClassMap<RBCTransaction>

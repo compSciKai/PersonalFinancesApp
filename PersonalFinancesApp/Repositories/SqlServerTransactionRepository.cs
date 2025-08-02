@@ -3,7 +3,7 @@ using PersonalFinances.Data;
 using PersonalFinances.Models;
 
 namespace PersonalFinances.Repositories;
-public class SqlServerTransactionRepository : ITransactionsRepository, ITransactionSavable
+public class SqlServerTransactionRepository<T> : ITransactionRepository<T> where T : Transaction
 {
     public readonly TransactionContext _context;
 
@@ -12,24 +12,22 @@ public class SqlServerTransactionRepository : ITransactionsRepository, ITransact
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public void ExportTransactions(List<Transaction> transactions, string filePath)
-    {
-        throw new NotImplementedException();
-    }
-
-    public async Task<List<T>> GetTransactionsAsync<T>() where T : Transaction
+    public async Task<List<T>> GetAllAsync()
     {
         return await _context.Set<T>()
             .OrderByDescending(t => t.Date)
             .ToListAsync();
     }
 
-    public List<T> GetTransactions<T>() where T : Transaction
+    public async Task<List<T>> GetByDateRangeAsync(DateTime start, DateTime end)
     {
-        return GetTransactionsAsync<T>().GetAwaiter().GetResult();
+        return await _context.Set<T>()
+            .Where(t => t.Date >= start && t.Date <= end)
+            .OrderByDescending(t => t.Date)
+            .ToListAsync();
     }
 
-    public async Task<int> SaveTransactionsWithHashAsync<T>(List<T> transactions) where T : Transaction
+    public async Task<int> SaveAsync(List<T> transactions)
     {
         // Generate hashes for all transactions
         foreach (var transaction in transactions)
@@ -54,6 +52,12 @@ public class SqlServerTransactionRepository : ITransactionsRepository, ITransact
         }
 
         return newTransactions.Count;
+    }
+
+    public async Task<bool> ExistsAsync(string transactionHash)
+    {
+        return await _context.Set<T>()
+            .AnyAsync(t => t.TransactionHash == transactionHash);
     }
 }
 

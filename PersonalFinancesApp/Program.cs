@@ -26,8 +26,12 @@ var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction(
 var entities = new TransactionContext();
 
 var FinancesApp = new PersonalFinancesApp(
-    new CsvTransactionRepository(),
-    new SqlServerTransactionRepository(entities),
+    new CsvTransactionRepository<RBCTransaction>(),
+    new CsvTransactionRepository<AmexTransaction>(),
+    new CsvTransactionRepository<PCFinancialTransaction>(),
+    new SqlServerTransactionRepository<RBCTransaction>(entities),
+    new SqlServerTransactionRepository<AmexTransaction>(entities),
+    new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
     TransactionsConsoleUserInteraction,
     new VendorsService(
         new VendorsRepository(vendersJsonPath),
@@ -40,12 +44,7 @@ var FinancesApp = new PersonalFinancesApp(
         TransactionsConsoleUserInteraction)
 );
 
-//if (string.IsNullOrEmpty(currentProfile))
-//{
-//    Console.WriteLine("No current profile specified. Please specifiy one before continuing");
-//}
-
-FinancesApp.Run(transactionsDictionary, transactionRange, currentProfile);
+await FinancesApp.RunAsync(transactionsDictionary, transactionRange, currentProfile);
 
 //TransactionContext entities = new TransactionContext();
 

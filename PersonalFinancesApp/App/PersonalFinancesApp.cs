@@ -4,31 +4,43 @@ using PersonalFinances.Models;
 namespace PersonalFinances.App;
 class PersonalFinancesApp
 {
-    private readonly ITransactionsRepository _transactionCsvRepository;
-    private readonly ITransactionsRepository _transactionSqlRepository;
+    private readonly IFileTransactionRepository<RBCTransaction> _rbcCsvRepository;
+    private readonly IFileTransactionRepository<AmexTransaction> _amexCsvRepository;
+    private readonly IFileTransactionRepository<PCFinancialTransaction> _pcCsvRepository;
+    private readonly ITransactionRepository<RBCTransaction> _rbcSqlRepository;
+    private readonly ITransactionRepository<AmexTransaction> _amexSqlRepository;
+    private readonly ITransactionRepository<PCFinancialTransaction> _pcSqlRepository;
     private readonly ITransactionsUserInteraction _transactionUserInteraction;
     private readonly IVendorsService _vendorsService;
     private readonly ICategoriesService _categoriesService;
     private readonly IBudgetService _budgetService;
 
     public PersonalFinancesApp(
-        ITransactionsRepository transactionCsvRepository,
-        ITransactionsRepository transactionSqlRepository, 
+        IFileTransactionRepository<RBCTransaction> rbcCsvRepository,
+        IFileTransactionRepository<AmexTransaction> amexCsvRepository,
+        IFileTransactionRepository<PCFinancialTransaction> pcCsvRepository,
+        ITransactionRepository<RBCTransaction> rbcSqlRepository,
+        ITransactionRepository<AmexTransaction> amexSqlRepository,
+        ITransactionRepository<PCFinancialTransaction> pcSqlRepository,
         ITransactionsUserInteraction transactionUserInteraction,
         IVendorsService vendorsService,
         ICategoriesService categoriesService,
         IBudgetService budgetService
         )
     {
-        _transactionCsvRepository = transactionCsvRepository;
-        _transactionSqlRepository = transactionSqlRepository;
+        _rbcCsvRepository = rbcCsvRepository;
+        _amexCsvRepository = amexCsvRepository;
+        _pcCsvRepository = pcCsvRepository;
+        _rbcSqlRepository = rbcSqlRepository;
+        _amexSqlRepository = amexSqlRepository;
+        _pcSqlRepository = pcSqlRepository;
         _transactionUserInteraction = transactionUserInteraction;
         _vendorsService = vendorsService; 
         _categoriesService = categoriesService;
         _budgetService = budgetService;
     }
 
-    public void Run(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString, string? currentProfile)
+    public async Task RunAsync(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString, string? currentProfile)
     {
         // load data from sources
         Console.WriteLine("Finances App Initialized\n");
@@ -68,18 +80,21 @@ class PersonalFinancesApp
         {
             if (transactionEntry.Value == typeof(RBCTransaction))
             {
-                var transactions = _transactionCsvRepository.GetTransactions<RBCTransaction>(transactionEntry.Key);
+                var transactions = await _rbcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
                 newTransactions.AddRange(transactions);
+                await _rbcSqlRepository.SaveAsync(transactions);
             }
             else if (transactionEntry.Value == typeof(AmexTransaction))
             {
-                var transactions = _transactionCsvRepository.GetTransactions<AmexTransaction>(transactionEntry.Key);
+                var transactions = await _amexCsvRepository.LoadFromFileAsync(transactionEntry.Key);
                 newTransactions.AddRange(transactions);
+                await _amexSqlRepository.SaveAsync(transactions);
             }
             else if (transactionEntry.Value == typeof(PCFinancialTransaction))
             {
-                var transactions = _transactionCsvRepository.GetTransactions<PCFinancialTransaction>(transactionEntry.Key);
+                var transactions = await _pcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
                 newTransactions.AddRange(transactions);
+                await _pcSqlRepository.SaveAsync(transactions);
             }
             else
             {
@@ -87,11 +102,15 @@ class PersonalFinancesApp
             }
         }
 
-        // save new transactions
-        _transactionSqlRepository.SaveTransactionsWithHashAsync(newTransactions);
-
         // fetch all transactions
-        var allTransactions = _transactionSqlRepository.GetTransactions<Transaction>();
+        var rbcTransactions = await _rbcSqlRepository.GetAllAsync();
+        var amexTransactions = await _amexSqlRepository.GetAllAsync();
+        var pcTransactions = await _pcSqlRepository.GetAllAsync();
+        
+        var allTransactions = new List<Transaction>();
+        allTransactions.AddRange(rbcTransactions);
+        allTransactions.AddRange(amexTransactions);
+        allTransactions.AddRange(pcTransactions);
 
         // process transactions if missing fields
 
