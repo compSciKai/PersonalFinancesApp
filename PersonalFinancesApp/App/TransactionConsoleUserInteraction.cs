@@ -275,7 +275,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                 return null;
             }
 
-            if (categoryKey is not "" && vendor.ToLower().Contains(categoryKey.ToLower()))
+            if (!string.IsNullOrEmpty(categoryKey) && vendor.ToLower().Contains(categoryKey.ToLower()))
             {
                 ShowMessage($"What is the category for this vendor? Press enter to save as '{categoryKey}'");
                 categoryValue = GetInput();

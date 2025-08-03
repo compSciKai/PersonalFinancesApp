@@ -74,26 +74,25 @@ class PersonalFinancesApp
         }
 
         // Get new transactions from CSV repository
-        List<Transaction> newTransactions = new List<Transaction>();
-
         foreach (var transactionEntry in transactionsDictionary)
         {
-            if (transactionEntry.Value == typeof(RBCTransaction))
+            if (string.IsNullOrEmpty(transactionEntry.Key))
+            {
+                continue; // Skip empty keys
+            }
+            else if (transactionEntry.Value == typeof(RBCTransaction))
             {
                 var transactions = await _rbcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                newTransactions.AddRange(transactions);
                 await _rbcSqlRepository.SaveAsync(transactions);
             }
             else if (transactionEntry.Value == typeof(AmexTransaction))
             {
                 var transactions = await _amexCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                newTransactions.AddRange(transactions);
                 await _amexSqlRepository.SaveAsync(transactions);
             }
             else if (transactionEntry.Value == typeof(PCFinancialTransaction))
             {
                 var transactions = await _pcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                newTransactions.AddRange(transactions);
                 await _pcSqlRepository.SaveAsync(transactions);
             }
             else
@@ -114,14 +113,6 @@ class PersonalFinancesApp
 
         // process transactions if missing fields
 
-        // output information 
-
-
-
-
-
-
-
         // construct list of transactions and handler dictionary, iterate over
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(allTransactions);
         List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
@@ -135,9 +126,12 @@ class PersonalFinancesApp
         filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
 
         List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
-        
+
         string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
         string tableName = rangeType is not null ? $"{rangeType} Transactions" : "Transactions";
+
+
+        // output information 
         _transactionUserInteraction.OutputTransactions(spendingTransactions, tableName, null);
 
         foreach (string category in categories)
@@ -152,6 +146,7 @@ class PersonalFinancesApp
 
         // Output Budget Vs Actual Spending Totals
         _transactionUserInteraction.OutputBudgetVsActual(filteredTransactions, profile);
+
 
         /* TODO:
         - [ ] Fix transfers
