@@ -8,24 +8,24 @@ using PersonalFinances.Repositories;
 using System;
 using System.Collections.Generic;
 
-string vendersJsonPath = "";
-string categoriesJsonPath = "";
-string BudgetProfilesJsonPath = "";
+string vendersJsonPath = @"";
+string categoriesJsonPath = @"";
+string BudgetProfilesJsonPath = @"";
 string currentProfile = "";
 
 // Transactions Paths
 var transactionsDictionary = new Dictionary<string, Type>
 {
-    { "", typeof(RBCTransaction) },
-    { "", typeof(AmexTransaction) }
+    { @"", typeof(RBCTransaction) },
+    { @"", typeof(AmexTransaction) }
 };
 
-TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
+TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.All;
 
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 var entities = new TransactionContext();
 
-var FinancesApp = new PersonalFinancesApp(
+var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     new CsvTransactionRepository<RBCTransaction>(),
     new CsvTransactionRepository<AmexTransaction>(),
     new CsvTransactionRepository<PCFinancialTransaction>(),
@@ -45,59 +45,3 @@ var FinancesApp = new PersonalFinancesApp(
 );
 
 await FinancesApp.RunAsync(transactionsDictionary, transactionRange, currentProfile);
-
-//TransactionContext entities = new TransactionContext();
-
-//Transaction rbcTestTransaction = new RBCTransaction()
-//{
-//    Description = "Test.",
-//    Date = DateTime.Now,
-//    Amount = 50.05m,
-//};
-
-//Transaction amexTestTransaction = new AmexTransaction()
-//{
-//    Description = "Test.",
-//    Date = DateTime.Now,
-//    Amount = 50.05m,
-//    AccountNumber = "123456",
-//    MemberName = "John Doe"
-//};
-
-//Transaction pcTestTransaction = new PCFinancialTransaction()
-//{
-//    Description = "Test.",
-//    Date = DateTime.Now,
-//    Amount = 50.05m,
-//    MemberName = "John Doe",
-//    TransactionType = "PC Financial"
-//};
-
-//using (var context = new TransactionContext())
-//{
-//    bool canConnect = context.Database.CanConnect();
-//    Console.WriteLine($"Can connect: {canConnect}");
-
-//    if (canConnect)
-//    {
-//        // Try to ensure database is created
-//        //context.Database.EnsureDeleted();
-//        context.Database.EnsureCreated();
-//        // ensure table created
-
-//    }
-//}
-
-
-//entities.Add(rbcTestTransaction);
-//entities.Add(amexTestTransaction);
-//entities.Add(pcTestTransaction);
-//entities.SaveChanges();
-
-//IEnumerable<Transaction> rbcTransactions = entities.RBCTransactions.ToList<Transaction>();
-
-//foreach (Transaction transaction in rbcTransactions)
-//{
-//    Console.WriteLine(transaction.Description);
-//}
-
