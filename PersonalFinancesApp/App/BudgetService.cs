@@ -6,63 +6,69 @@ namespace PersonalFinances.App;
 
 public class BudgetService : IBudgetService
 {
-    public List<BudgetProfile> BudgetProfiles {get; private set;}
-    IBudgetRepository _budgetRepository;
-    ITransactionsUserInteraction _transactionUserInteraction;
+    private readonly IBudgetRepository _databaseRepository;
+    private readonly IBudgetRepository? _jsonRepository;
+    private readonly ITransactionsUserInteraction _transactionUserInteraction;
 
     public BudgetService(
-        IBudgetRepository budgetRepository,
-        ITransactionsUserInteraction transactionUserInteraction)
+        IBudgetRepository databaseRepository,
+        ITransactionsUserInteraction transactionUserInteraction,
+        IBudgetRepository? jsonRepository = null)
     {
-        _budgetRepository = budgetRepository;
+        _databaseRepository = databaseRepository;
+        _jsonRepository = jsonRepository;
         _transactionUserInteraction = transactionUserInteraction;
-        BudgetProfiles = budgetRepository.LoadBudgetProfiles();
     }
-    public BudgetProfile? GetProfile(string profileName)
+    public async Task<List<BudgetProfile>> LoadProfilesAsync()
     {
-        return BudgetProfiles.Find(profile => profile.Name == profileName);
+        return await _databaseRepository.LoadBudgetProfilesAsync();
     }
 
-
-    public void StoreProfile(BudgetProfile profile)
+    public async Task<BudgetProfile?> GetProfileAsync(string profileName)
     {
-        if (GetProfile(profile.Name) is not null)
+        return await _databaseRepository.GetProfileByNameAsync(profileName);
+    }
+
+    public async Task<BudgetProfile?> GetProfileByIdAsync(int id)
+    {
+        return await _databaseRepository.GetProfileByIdAsync(id);
+    }
+
+    public async Task StoreProfileAsync(BudgetProfile profile)
+    {
+        var existing = await GetProfileAsync(profile.Name);
+        if (existing is not null && existing.Id != profile.Id)
         {
             _transactionUserInteraction.ShowMessage($"Profile with name {profile.Name} already exists.");
-
             return;
         }
 
-        BudgetProfiles.Add(profile);
-        _budgetRepository.SaveBudgetProfiles(BudgetProfiles);
-    }
+        // Save to database
+        await _databaseRepository.SaveBudgetProfileAsync(profile);
 
-    List<string> GetProfileNames()
-    {
-        List<string> profileNames = new List<string>();
-
-        foreach (var profile in BudgetProfiles)
+        // Also save to JSON as backup if repository is provided
+        if (_jsonRepository != null)
         {
-            profileNames.Add(profile.Name);
+            try
+            {
+                await _jsonRepository.SaveBudgetProfileAsync(profile);
+            }
+            catch (Exception ex)
+            {
+                _transactionUserInteraction.ShowMessage($"Warning: Could not save to JSON backup: {ex.Message}");
+            }
         }
-
-        return profileNames;
     }
 
-    public BudgetProfile? GetActiveProfile()
+    private async Task<List<string>> GetProfileNamesAsync()
     {
-                //TODO: set budget profile here
-        /*
-            consider asking user questinos
-            which budget profile to use
-            set categories here -> each profile with contain budget amounts for each category
-            set date range
+        var profiles = await LoadProfilesAsync();
+        return profiles.Select(p => p.Name).ToList();
+    }
 
-            budgetService
-                - getProfile to return unique budget
-                - setProfile to update budget categories
-        */
-        List<string> profileNames = GetProfileNames();
+    public async Task<BudgetProfile?> GetActiveProfileAsync()
+    {
+        var profileNames = await GetProfileNamesAsync();
         string? profileChoice = null;
         if (profileNames.Count > 0)
         {
@@ -71,13 +77,13 @@ public class BudgetService : IBudgetService
 
         if (profileChoice is not null)
         {
-            return GetProfile(profileChoice);
+            return await GetProfileAsync(profileChoice);
         }
 
         return null;
     }
 
-    public BudgetProfile CreateNewProfile()
+    public async Task<BudgetProfile> CreateNewProfileAsync()
     {
         _transactionUserInteraction.ShowMessage("What is the name for this profile?");
         string profileName = _transactionUserInteraction.GetInput();
@@ -97,7 +103,6 @@ public class BudgetService : IBudgetService
 
             isIncorrectIncomeValue = !double.TryParse(incomeString, out income);
         }
-        
 
         Dictionary<string, double> budgets = new Dictionary<string, double>();
         bool isMoreCategories = true;
@@ -112,7 +117,6 @@ public class BudgetService : IBudgetService
                 _transactionUserInteraction.ShowMessage("What is the limit for this budget category?\n");
                 string stringAmount = _transactionUserInteraction.GetInput();
 
-                // TODO: try to set dictionary. Input might fail if tried twice
                 double amount;
                 if (double.TryParse(stringAmount, out amount))
                 {
@@ -127,7 +131,7 @@ public class BudgetService : IBudgetService
         }
 
         BudgetProfile newBudgetProfile = new BudgetProfile(profileName, budgets, income, userName, description);
-        StoreProfile(newBudgetProfile);
+        await StoreProfileAsync(newBudgetProfile);
 
         return newBudgetProfile;
     }
@@ -143,5 +147,62 @@ public class BudgetService : IBudgetService
         }
 
         return sum;
+    }
+
+    public async Task MigrateProfilesToDatabaseAsync()
+    {
+        if (_jsonRepository == null)
+        {
+            _transactionUserInteraction.ShowMessage("No JSON repository configured for migration.");
+            return;
+        }
+
+        _transactionUserInteraction.ShowMessage("Starting migration of profiles from JSON to database...");
+
+        try
+        {
+            // Load profiles from JSON
+            var jsonProfiles = await _jsonRepository.LoadBudgetProfilesAsync();
+
+            if (jsonProfiles.Count == 0)
+            {
+                _transactionUserInteraction.ShowMessage("No profiles found in JSON file to migrate.");
+                return;
+            }
+
+            _transactionUserInteraction.ShowMessage($"Found {jsonProfiles.Count} profiles to migrate.");
+
+            // Check which profiles already exist in database
+            var existingProfiles = await _databaseRepository.LoadBudgetProfilesAsync();
+            int migratedCount = 0;
+            int skippedCount = 0;
+
+            foreach (var profile in jsonProfiles)
+            {
+                var existing = existingProfiles.FirstOrDefault(p => p.Name == profile.Name);
+
+                if (existing == null)
+                {
+                    // Profile doesn't exist in database, migrate it
+                    await _databaseRepository.SaveBudgetProfileAsync(profile);
+                    migratedCount++;
+                    _transactionUserInteraction.ShowMessage($"  ✓ Migrated profile: {profile.Name}");
+                }
+                else
+                {
+                    skippedCount++;
+                    _transactionUserInteraction.ShowMessage($"  - Skipped profile (already exists): {profile.Name}");
+                }
+            }
+
+            _transactionUserInteraction.ShowMessage($"\nMigration complete!");
+            _transactionUserInteraction.ShowMessage($"  Migrated: {migratedCount}");
+            _transactionUserInteraction.ShowMessage($"  Skipped: {skippedCount}");
+        }
+        catch (Exception ex)
+        {
+            _transactionUserInteraction.ShowMessage($"Error during migration: {ex.Message}");
+            throw;
+        }
     }
 }

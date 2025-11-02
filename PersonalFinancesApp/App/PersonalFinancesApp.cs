@@ -46,14 +46,14 @@ class PersonalFinancesApp
         Console.WriteLine("Finances App Initialized\n");
         List<string> categories = _categoriesService.GetAllCategories();
 
-        BudgetProfile? profile = _budgetService.GetProfile(currentProfile);
-        if (profile is null) 
+        BudgetProfile? profile = await _budgetService.GetProfileAsync(currentProfile);
+        if (profile is null)
         {
-            profile = _budgetService.GetActiveProfile();
+            profile = await _budgetService.GetActiveProfileAsync();
             if (profile is null)
             {
                 _transactionUserInteraction.ShowMessage("No budget profiles found. Creating first profile...");
-                profile = _budgetService.CreateNewProfile();
+                profile = await _budgetService.CreateNewProfileAsync();
             }
         }
 

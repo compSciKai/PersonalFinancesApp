@@ -20,17 +20,20 @@ namespace PersonalFinancesAppTests
 
         public void SetupOneProfileExists()
         {
-            _budgetRepositoryMock.Setup(repo => repo.LoadBudgetProfiles())
-                .Returns(new List<BudgetProfile>
-                {
-                    new BudgetProfile(
-                        name: "TestProfile",
-                        budgetCategories: new Dictionary<string, double>(),
-                        income: 1000,
-                        username: "UserA",
-                        description: "Mock budget profile"
-                    )
-                });
+            var testProfile = new BudgetProfile(
+                name: "TestProfile",
+                budgetCategories: new Dictionary<string, double>(),
+                income: 1000,
+                username: "UserA",
+                description: "Mock budget profile"
+            );
+
+            _budgetRepositoryMock.Setup(repo => repo.LoadBudgetProfilesAsync())
+                .ReturnsAsync(new List<BudgetProfile> { testProfile });
+            _budgetRepositoryMock.Setup(repo => repo.GetProfileByNameAsync("TestProfile"))
+                .ReturnsAsync(testProfile);
+            _budgetRepositoryMock.Setup(repo => repo.GetProfileByNameAsync(It.Is<string>(s => s != "TestProfile")))
+                .ReturnsAsync((BudgetProfile?)null);
 
             _cut = new BudgetService(_budgetRepositoryMock.Object, _transactionUserInteractionMock.Object);
         }
@@ -38,62 +41,71 @@ namespace PersonalFinancesAppTests
         public void SetupNoProfilesExist()
         {
             _budgetRepositoryMock = new Mock<IBudgetRepository>();
-            _budgetRepositoryMock.Setup(repo => repo.LoadBudgetProfiles())
-                .Returns(new List<BudgetProfile>());
+            _budgetRepositoryMock.Setup(repo => repo.LoadBudgetProfilesAsync())
+                .ReturnsAsync(new List<BudgetProfile>());
+            _budgetRepositoryMock.Setup(repo => repo.GetProfileByNameAsync(It.IsAny<string>()))
+                .ReturnsAsync((BudgetProfile?)null);
 
             _cut = new BudgetService(_budgetRepositoryMock.Object, _transactionUserInteractionMock.Object);
         }
 
         public void SetupTwoProfilesExist()
         {
-            _budgetRepositoryMock.Setup(repo => repo.LoadBudgetProfiles())
-                .Returns(new List<BudgetProfile>
-                {
-                    new BudgetProfile(
-                        name: "Profile1",
-                        budgetCategories: new Dictionary<string, double>(),
-                        income: 1000,
-                        username: "UserA",
-                        description: "First profile"
-                    ),
-                    new BudgetProfile(
-                        name: "Profile2",
-                        budgetCategories: new Dictionary<string, double>(),
-                        income: 2000,
-                        username: "UserB",
-                        description: "Second profile"
-                    )
-                });
+            var profile1 = new BudgetProfile(
+                name: "Profile1",
+                budgetCategories: new Dictionary<string, double>(),
+                income: 1000,
+                username: "UserA",
+                description: "First profile"
+            );
+
+            var profile2 = new BudgetProfile(
+                name: "Profile2",
+                budgetCategories: new Dictionary<string, double>(),
+                income: 2000,
+                username: "UserB",
+                description: "Second profile"
+            );
+
+            _budgetRepositoryMock.Setup(repo => repo.LoadBudgetProfilesAsync())
+                .ReturnsAsync(new List<BudgetProfile> { profile1, profile2 });
+            _budgetRepositoryMock.Setup(repo => repo.GetProfileByNameAsync("Profile1"))
+                .ReturnsAsync(profile1);
+            _budgetRepositoryMock.Setup(repo => repo.GetProfileByNameAsync("Profile2"))
+                .ReturnsAsync(profile2);
 
             _cut = new BudgetService(_budgetRepositoryMock.Object, _transactionUserInteractionMock.Object);
         }
 
         [Test]
-        public void GetProfile_ReturnsBudgetProfile_WhenProfileNameGiven()
+        public async Task GetProfile_ReturnsBudgetProfile_WhenProfileNameGiven()
         {
             SetupOneProfileExists();
 
-            Assert.IsNotNull(_cut.GetProfile("TestProfile"));
+            var result = await _cut.GetProfileAsync("TestProfile");
+            Assert.IsNotNull(result);
         }
 
         [Test]
-        public void GetProfile_ReturnsNull_WhenProfileWithNameDoesNotExist()
+        public async Task GetProfile_ReturnsNull_WhenProfileWithNameDoesNotExist()
         {
             SetupOneProfileExists();
 
-            Assert.IsNull(_cut.GetProfile("UnknownProfileName"));
+            var result = await _cut.GetProfileAsync("UnknownProfileName");
+            Assert.IsNull(result);
         }
 
         [Test]
-        public void GetProfile_ReturnsNull_WhenNoProfilesExist()
+        public async Task GetProfile_ReturnsNull_WhenNoProfilesExist()
         {
             SetupNoProfilesExist();
 
-            Assert.IsNull(_cut.GetProfile("TestProfile"));
+            var result = await _cut.GetProfileAsync("TestProfile");
+            Assert.IsNull(result);
         }
 
         [Test]
-        public void StoreProfile_AddsProfileToListAndSaves()
+        public async Task StoreProfile_AddsProfileToListAndSaves()
         {
             SetupNoProfilesExist();
 
@@ -105,14 +117,13 @@ namespace PersonalFinancesAppTests
                 description: "New budget profile"
             );
 
-            _cut.StoreProfile(newProfile);
+            await _cut.StoreProfileAsync(newProfile);
 
-            _budgetRepositoryMock.Verify(repo => repo.SaveBudgetProfiles(It.IsAny<List<BudgetProfile>>()), Times.Once);
-            Assert.IsNotNull(_cut.GetProfile("NewProfile"));
+            _budgetRepositoryMock.Verify(repo => repo.SaveBudgetProfileAsync(It.IsAny<BudgetProfile>()), Times.Once);
         }
 
         [Test]
-        public void StoreProfile_DoesNotAddDuplicateProfile()
+        public async Task StoreProfile_DoesNotAddDuplicateProfile()
         {
             SetupOneProfileExists();
 
@@ -124,20 +135,20 @@ namespace PersonalFinancesAppTests
                 description: "Duplicate profile"
             );
 
-            _cut.StoreProfile(duplicateProfile);
+            await _cut.StoreProfileAsync(duplicateProfile);
 
-            Assert.That(_cut.BudgetProfiles.Count, Is.EqualTo(1));
+            _budgetRepositoryMock.Verify(repo => repo.SaveBudgetProfileAsync(It.IsAny<BudgetProfile>()), Times.Never);
         }
 
         [Test]
-        public void GetActiveProfile_ReturnsSelectedProfile_WhenUserSelectionValid()
+        public async Task GetActiveProfile_ReturnsSelectedProfile_WhenUserSelectionValid()
         {
             SetupTwoProfilesExist();
 
             _transactionUserInteractionMock.Setup(ui => ui.PromptForProfileChoice(It.IsAny<List<string>>()))
                 .Returns("Profile1");
 
-            var activeProfile = _cut.GetActiveProfile();
+            var activeProfile = await _cut.GetActiveProfileAsync();
 
             Assert.IsNotNull(activeProfile);
             Assert.That(activeProfile.Name, Is.EqualTo("Profile1"));
@@ -145,20 +156,20 @@ namespace PersonalFinancesAppTests
 
 
         [Test]
-        public void GetActiveProfile_ReturnsNull_WhenUserSelectionIsInvalid()
+        public async Task GetActiveProfile_ReturnsNull_WhenUserSelectionIsInvalid()
         {
             SetupTwoProfilesExist();
 
             _transactionUserInteractionMock.Setup(ui => ui.PromptForProfileChoice(It.IsAny<List<string>>()))
                 .Returns((string?)null);
 
-            var activeProfile = _cut.GetActiveProfile();
+            var activeProfile = await _cut.GetActiveProfileAsync();
 
             Assert.IsNull(activeProfile);
         }
 
         [Test]
-        public void CreateNewProfile_CreatesAndStoresNewProfile_WithValidData()
+        public async Task CreateNewProfile_CreatesAndStoresNewProfile_WithValidData()
         {
             SetupNoProfilesExist();
 
@@ -170,18 +181,17 @@ namespace PersonalFinancesAppTests
                 description: "New budget profile for testing"
             );
 
-            _cut.StoreProfile(newProfile);
+            await _cut.StoreProfileAsync(newProfile);
 
-            _budgetRepositoryMock.Verify(repo => repo.SaveBudgetProfiles(It.IsAny<List<BudgetProfile>>()), Times.Once);
-            Assert.IsNotNull(_cut.GetProfile("NewProfile"));
+            _budgetRepositoryMock.Verify(repo => repo.SaveBudgetProfileAsync(It.IsAny<BudgetProfile>()), Times.Once);
         }
 
         [Test]
-        public void GetBudgetTotal_ReturnsCorrectTotal_WhenProfileExists()
+        public async Task GetBudgetTotal_ReturnsCorrectTotal_WhenProfileExists()
         {
             SetupOneProfileExists();
 
-            var profile = _cut.GetProfile("TestProfile");
+            var profile = await _cut.GetProfileAsync("TestProfile");
 
             profile.BudgetCategories.Add("Food", 300);
             profile.BudgetCategories.Add("Transport", 200);

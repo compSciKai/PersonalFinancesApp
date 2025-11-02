@@ -25,6 +25,21 @@ TransactionFilterService.TransactionRange transactionRange = TransactionFilterSe
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 var entities = new TransactionContext();
 
+var budgetService = new BudgetService(
+    new DatabaseBudgetRepository(entities),
+    TransactionsConsoleUserInteraction,
+    new BudgetRepository(BudgetProfilesJsonPath));
+
+// Check for migration command
+if (args.Length > 0 && args[0] == "migrate-profiles")
+{
+    Console.WriteLine("Running profile migration from JSON to database...\n");
+    await budgetService.MigrateProfilesToDatabaseAsync();
+    Console.WriteLine("\nMigration complete. Press any key to exit...");
+    Console.ReadKey();
+    return;
+}
+
 var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     new CsvTransactionRepository<RBCTransaction>(),
     new CsvTransactionRepository<AmexTransaction>(),
@@ -39,9 +54,7 @@ var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     new CategoriesService(
         new CategoriesRepository(categoriesJsonPath),
         TransactionsConsoleUserInteraction),
-    new BudgetService(
-        new BudgetRepository(BudgetProfilesJsonPath),
-        TransactionsConsoleUserInteraction)
+    budgetService
 );
 
-await FinancesApp.RunAsync(transactionsDictionary, transactionRange, currentProfile);
+await FinancesApp.RunAsync(transactionsDictionary, transactionRange, currentProfile);
