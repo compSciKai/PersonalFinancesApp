@@ -43,6 +43,15 @@ public class BudgetService : IBudgetService
             return;
         }
 
+        // Validate categories for duplicates
+        var (isValid, duplicateCategories) = profile.ValidateCategories();
+        if (!isValid)
+        {
+            _transactionUserInteraction.ShowMessage(
+                $"Error: Cannot save profile. Duplicate categories found: {string.Join(", ", duplicateCategories)}");
+            return;
+        }
+
         // Save to database
         await _databaseRepository.SaveBudgetProfileAsync(profile);
 
@@ -120,8 +129,22 @@ public class BudgetService : IBudgetService
                 double amount;
                 if (double.TryParse(stringAmount, out amount))
                 {
-                    budgets[newCategory] = amount;
-                    _transactionUserInteraction.ShowMessage($"\n{newCategory} set to ${amount.ToString("0.00")}");
+                    // Check if category already exists (case-insensitive)
+                    var existingKey = budgets.Keys.FirstOrDefault(k =>
+                        k.Equals(newCategory, StringComparison.OrdinalIgnoreCase));
+
+                    if (existingKey != null)
+                    {
+                        var oldAmount = budgets[existingKey];
+                        budgets[existingKey] = amount;
+                        _transactionUserInteraction.ShowMessage(
+                            $"\nUpdating '{existingKey}' from ${oldAmount.ToString("0.00")} to ${amount.ToString("0.00")}");
+                    }
+                    else
+                    {
+                        budgets[newCategory] = amount;
+                        _transactionUserInteraction.ShowMessage($"\n{newCategory} set to ${amount.ToString("0.00")}");
+                    }
                 }
             }
             else
@@ -176,6 +199,7 @@ public class BudgetService : IBudgetService
             var existingProfiles = await _databaseRepository.LoadBudgetProfilesAsync();
             int migratedCount = 0;
             int skippedCount = 0;
+            int errorCount = 0;
 
             foreach (var profile in jsonProfiles)
             {
@@ -183,10 +207,29 @@ public class BudgetService : IBudgetService
 
                 if (existing == null)
                 {
-                    // Profile doesn't exist in database, migrate it
-                    await _databaseRepository.SaveBudgetProfileAsync(profile);
-                    migratedCount++;
-                    _transactionUserInteraction.ShowMessage($"  ✓ Migrated profile: {profile.Name}");
+                    // Validate profile before migration
+                    var (isValid, duplicateCategories) = profile.ValidateCategories();
+                    if (!isValid)
+                    {
+                        errorCount++;
+                        _transactionUserInteraction.ShowMessage(
+                            $"  ✗ Error: Profile '{profile.Name}' has duplicate categories: {string.Join(", ", duplicateCategories)}");
+                        continue;
+                    }
+
+                    try
+                    {
+                        // Profile doesn't exist in database, migrate it
+                        await _databaseRepository.SaveBudgetProfileAsync(profile);
+                        migratedCount++;
+                        _transactionUserInteraction.ShowMessage($"  ✓ Migrated profile: {profile.Name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        errorCount++;
+                        _transactionUserInteraction.ShowMessage(
+                            $"  ✗ Error migrating profile '{profile.Name}': {ex.Message}");
+                    }
                 }
                 else
                 {
@@ -198,6 +241,10 @@ public class BudgetService : IBudgetService
             _transactionUserInteraction.ShowMessage($"\nMigration complete!");
             _transactionUserInteraction.ShowMessage($"  Migrated: {migratedCount}");
             _transactionUserInteraction.ShowMessage($"  Skipped: {skippedCount}");
+            if (errorCount > 0)
+            {
+                _transactionUserInteraction.ShowMessage($"  Errors: {errorCount}");
+            }
         }
         catch (Exception ex)
         {

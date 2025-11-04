@@ -43,6 +43,22 @@ public class BudgetProfile : BaseEntity
         UserName = username;
     }
 
+    /// <summary>
+    /// Validates that there are no duplicate category names in the profile.
+    /// Case-insensitive comparison.
+    /// </summary>
+    /// <returns>Tuple with IsValid flag and list of duplicate category names</returns>
+    public (bool IsValid, List<string> DuplicateCategories) ValidateCategories()
+    {
+        var duplicates = Categories
+            .GroupBy(c => c.CategoryName, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        return (!duplicates.Any(), duplicates);
+    }
+
     public override string ToString()
     {
         return $"Name: {Name}\nDescription: {Description}\nIncome: ${Income.ToString("0.00")}\n\nBudget:\n{BudgetCategories.ToString(": $", "\n")}";

@@ -80,7 +80,26 @@ public class DatabaseBudgetRepository : IBudgetRepository
             await _context.BudgetProfiles.AddAsync(profile);
         }
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("IX_BudgetCategory_ProfileId_CategoryName") == true)
+        {
+            // Extract duplicate category names from the exception if possible
+            var duplicates = profile.Categories
+                .GroupBy(c => c.CategoryName, StringComparer.OrdinalIgnoreCase)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            var duplicateList = duplicates.Any() ? string.Join(", ", duplicates) : "unknown categories";
+
+            throw new InvalidOperationException(
+                $"Cannot save budget profile '{profile.Name}': Duplicate category names detected ({duplicateList}). " +
+                $"Each category must have a unique name within the profile.",
+                ex);
+        }
     }
 
     public async Task DeleteBudgetProfileAsync(int id)
