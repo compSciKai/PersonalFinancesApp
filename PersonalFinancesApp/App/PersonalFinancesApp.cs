@@ -1,9 +1,11 @@
 using PersonalFinances.Repositories;
 using PersonalFinances.Models;
+using System.Text.Json;
 
 namespace PersonalFinances.App;
 class PersonalFinancesApp
 {
+    private const string ConfigFilePath = "appconfig.json";
     private readonly IFileTransactionRepository<RBCTransaction> _rbcCsvRepository;
     private readonly IFileTransactionRepository<AmexTransaction> _amexCsvRepository;
     private readonly IFileTransactionRepository<PCFinancialTransaction> _pcCsvRepository;
@@ -35,9 +37,47 @@ class PersonalFinancesApp
         _amexSqlRepository = amexSqlRepository;
         _pcSqlRepository = pcSqlRepository;
         _transactionUserInteraction = transactionUserInteraction;
-        _vendorsService = vendorsService; 
+        _vendorsService = vendorsService;
         _categoriesService = categoriesService;
         _budgetService = budgetService;
+    }
+
+    private async Task<string?> LoadLastUsedProfileAsync()
+    {
+        try
+        {
+            if (File.Exists(ConfigFilePath))
+            {
+                string json = await File.ReadAllTextAsync(ConfigFilePath);
+                var config = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                return config?.ContainsKey("LastUsedProfile") == true ? config["LastUsedProfile"] : null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _transactionUserInteraction.ShowMessage($"Warning: Could not load last used profile: {ex.Message}");
+        }
+        return null;
+    }
+
+    private async Task SaveLastUsedProfileAsync(string profileName)
+    {
+        try
+        {
+            var config = new Dictionary<string, string>
+            {
+                ["LastUsedProfile"] = profileName,
+                ["LastUpdated"] = DateTime.UtcNow.ToString("o")
+            };
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            var json = JsonSerializer.Serialize(config, options);
+            await File.WriteAllTextAsync(ConfigFilePath, json);
+        }
+        catch (Exception ex)
+        {
+            _transactionUserInteraction.ShowMessage($"Warning: Could not save last used profile: {ex.Message}");
+        }
     }
 
     public async Task RunAsync(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString, string? currentProfile)
@@ -46,9 +86,96 @@ class PersonalFinancesApp
         Console.WriteLine("Finances App Initialized\n");
         List<string> categories = _categoriesService.GetAllCategories();
 
-        BudgetProfile? profile = await _budgetService.GetProfileAsync(currentProfile);
-        if (profile is null)
+        BudgetProfile? profile = null;
+        bool createNewProfile = false;
+
+        // Load last used profile if no current profile specified
+        if (string.IsNullOrEmpty(currentProfile))
         {
+            var lastUsedProfile = await LoadLastUsedProfileAsync();
+            if (!string.IsNullOrEmpty(lastUsedProfile))
+            {
+                currentProfile = lastUsedProfile;
+                _transactionUserInteraction.ShowMessage($"Last used profile: {currentProfile}");
+            }
+        }
+
+        // If a profile name is specified, ask user what they want to do
+        if (!string.IsNullOrEmpty(currentProfile))
+        {
+            _transactionUserInteraction.ShowMessage($"Profile '{currentProfile}' specified.");
+            _transactionUserInteraction.ShowMessage("What would you like to do?");
+            _transactionUserInteraction.ShowMessage("1. Load existing profile (default)");
+            _transactionUserInteraction.ShowMessage("2. Create new profile");
+            _transactionUserInteraction.ShowMessage("3. Select from available profiles");
+            _transactionUserInteraction.ShowMessage("4. Quick launch (press Enter to continue)\n");
+
+            string choice = _transactionUserInteraction.GetInput().Trim();
+
+            // Input validation
+            if (!new[] { "1", "2", "3", "4", "" }.Contains(choice))
+            {
+                _transactionUserInteraction.ShowMessage($"Invalid choice '{choice}'. Using default (1).\n");
+                choice = "1";
+            }
+
+            if (choice == "2")
+            {
+                createNewProfile = true;
+            }
+            else if (choice == "3")
+            {
+                profile = await _budgetService.GetActiveProfileAsync();
+            }
+            else if (choice == "4" || choice == "")
+            {
+                // Quick launch - load profile directly without prompting
+                profile = await _budgetService.GetProfileAsync(currentProfile);
+                if (profile is null)
+                {
+                    _transactionUserInteraction.ShowMessage($"Profile '{currentProfile}' not found.");
+                    profile = await _budgetService.GetActiveProfileAsync();
+                }
+                else
+                {
+                    _transactionUserInteraction.ShowMessage($"Quick launching with profile '{currentProfile}'...\n");
+                }
+            }
+            else // Option 1 - load existing with confirmation
+            {
+                profile = await _budgetService.GetProfileAsync(currentProfile);
+                if (profile is null)
+                {
+                    _transactionUserInteraction.ShowMessage($"Profile '{currentProfile}' not found.");
+                    profile = await _budgetService.GetActiveProfileAsync();
+                }
+                else
+                {
+                    // Show profile details before confirming
+                    _transactionUserInteraction.ShowMessage("\n=== Profile Details ===");
+                    _transactionUserInteraction.ShowMessage(profile.ToString());
+                    _transactionUserInteraction.ShowMessage("=======================\n");
+
+                    _transactionUserInteraction.ShowMessage("Press Enter to continue or 'n' to choose a different profile: ");
+                    string confirm = _transactionUserInteraction.GetInput().Trim().ToLower();
+
+                    if (confirm == "n")
+                    {
+                        _transactionUserInteraction.ShowMessage("");
+                        profile = await _budgetService.GetActiveProfileAsync();
+                    }
+                }
+            }
+        }
+
+        // Create new profile if requested or if no profile loaded yet
+        if (createNewProfile)
+        {
+            profile = await _budgetService.CreateNewProfileAsync();
+        }
+        else if (profile is null)
+        {
+            // Try to get active profile or create first one
             profile = await _budgetService.GetActiveProfileAsync();
             if (profile is null)
             {
@@ -56,6 +183,9 @@ class PersonalFinancesApp
                 profile = await _budgetService.CreateNewProfileAsync();
             }
         }
+
+        // Save the selected profile as last used
+        await SaveLastUsedProfileAsync(profile.Name);
 
         double budgetTotal = _budgetService.GetBudgetTotal(profile);
 
