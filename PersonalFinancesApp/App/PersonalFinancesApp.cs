@@ -80,7 +80,7 @@ class PersonalFinancesApp
         }
     }
 
-    public async Task RunAsync(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString, string? currentProfile)
+    public async Task RunAsync(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString)
     {
         // load data from sources
         Console.WriteLine("Finances App Initialized\n");
@@ -88,16 +88,13 @@ class PersonalFinancesApp
 
         BudgetProfile? profile = null;
         bool createNewProfile = false;
+        var currentProfile = "";
 
-        // Load last used profile if no current profile specified
-        if (string.IsNullOrEmpty(currentProfile))
+        var lastUsedProfile = await LoadLastUsedProfileAsync();
+        if (!string.IsNullOrEmpty(lastUsedProfile))
         {
-            var lastUsedProfile = await LoadLastUsedProfileAsync();
-            if (!string.IsNullOrEmpty(lastUsedProfile))
-            {
-                currentProfile = lastUsedProfile;
-                _transactionUserInteraction.ShowMessage($"Last used profile: {currentProfile}");
-            }
+            currentProfile = lastUsedProfile;
+            _transactionUserInteraction.ShowMessage($"Last used profile: {currentProfile}");
         }
 
         // If a profile name is specified, ask user what they want to do
@@ -190,15 +187,51 @@ class PersonalFinancesApp
         double budgetTotal = _budgetService.GetBudgetTotal(profile);
 
         // show profile info
-
-        // TODO: output profile. Ask user if it is okay or would like to edit
         _transactionUserInteraction.ShowMessage($"Budget profile set to:\n");
         _transactionUserInteraction.ShowMessage(profile.ToString());
         _transactionUserInteraction.ShowMessage($"\nBudget Total: ${budgetTotal.ToString("0.00")}");
 
-        _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, or enter to continue...");
-        var input = _transactionUserInteraction.GetInput();
-        if (input == "q")
+        _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, or Enter to continue...");
+        string userInput = _transactionUserInteraction.GetInput().Trim().ToLower();
+
+        if (userInput == "e")
+        {
+            // Edit loop
+            bool continueEditing = true;
+            while (continueEditing)
+            {
+                var editedProfile = await _budgetService.EditProfileAsync(profile);
+
+                if (editedProfile != null) // User confirmed changes
+                {
+                    profile = editedProfile; // Update current profile reference
+                    await SaveLastUsedProfileAsync(profile.Name); // Update last used if name changed
+
+                    // Re-display updated profile
+                    _transactionUserInteraction.ShowMessage("\n" + new string('=', 50));
+                    _transactionUserInteraction.ShowMessage($"Budget profile set to:\n");
+                    _transactionUserInteraction.ShowMessage(profile.ToString());
+                    budgetTotal = _budgetService.GetBudgetTotal(profile);
+                    _transactionUserInteraction.ShowMessage($"\nBudget Total: ${budgetTotal.ToString("0.00")}");
+                    _transactionUserInteraction.ShowMessage(new string('=', 50) + "\n");
+
+                    // Ask again
+                    _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, or Enter to continue...");
+                    userInput = _transactionUserInteraction.GetInput().Trim().ToLower();
+
+                    if (userInput != "e")
+                    {
+                        continueEditing = false;
+                    }
+                }
+                else // User cancelled
+                {
+                    continueEditing = false;
+                }
+            }
+        }
+
+        if (userInput == "q")
         {
             _transactionUserInteraction.Exit();
         }

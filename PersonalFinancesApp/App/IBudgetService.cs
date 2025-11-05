@@ -12,4 +12,9 @@ public interface IBudgetService
     double GetBudgetTotal(BudgetProfile profile);
     Task<List<BudgetProfile>> LoadProfilesAsync();
     Task MigrateProfilesToDatabaseAsync();
+
+    /// <summary>
+    /// Interactively edit a budget profile. Returns updated profile if saved, null if cancelled.
+    /// </summary>
+    Task<BudgetProfile?> EditProfileAsync(BudgetProfile profile);
 }

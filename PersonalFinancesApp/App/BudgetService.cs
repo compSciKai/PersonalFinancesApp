@@ -252,4 +252,344 @@ public class BudgetService : IBudgetService
             throw;
         }
     }
+
+    public async Task<BudgetProfile?> EditProfileAsync(BudgetProfile profile)
+    {
+        // Create a working copy to track changes
+        var originalProfile = new BudgetProfile
+        {
+            Id = profile.Id,
+            Name = profile.Name,
+            UserName = profile.UserName,
+            Description = profile.Description,
+            Income = profile.Income,
+            Categories = profile.Categories.Select(c => new BudgetCategory
+            {
+                CategoryName = c.CategoryName,
+                BudgetAmount = c.BudgetAmount
+            }).ToList()
+        };
+
+        var workingProfile = profile; // Edit this one
+        var changes = new List<string>(); // Track what changed
+
+        bool editing = true;
+        while (editing)
+        {
+            _transactionUserInteraction.ShowMessage("\n=== Edit Profile ===");
+            _transactionUserInteraction.ShowMessage($"1. Name ({workingProfile.Name})");
+            _transactionUserInteraction.ShowMessage($"2. Username ({workingProfile.UserName})");
+            _transactionUserInteraction.ShowMessage($"3. Description ({workingProfile.Description})");
+            _transactionUserInteraction.ShowMessage($"4. Income (${workingProfile.Income.ToString("0.00")})");
+            _transactionUserInteraction.ShowMessage($"5. Categories ({workingProfile.Categories.Count} items)");
+            _transactionUserInteraction.ShowMessage("6. Save changes");
+            _transactionUserInteraction.ShowMessage("7. Cancel (discard changes)\n");
+
+            _transactionUserInteraction.ShowMessage("Select option (1-7): ");
+            string choice = _transactionUserInteraction.GetInput().Trim();
+
+            switch (choice)
+            {
+                case "1":
+                    EditProfileName(workingProfile, originalProfile, changes);
+                    break;
+                case "2":
+                    EditUserName(workingProfile, originalProfile, changes);
+                    break;
+                case "3":
+                    EditDescription(workingProfile, originalProfile, changes);
+                    break;
+                case "4":
+                    EditIncome(workingProfile, originalProfile, changes);
+                    break;
+                case "5":
+                    EditCategories(workingProfile, originalProfile, changes);
+                    break;
+                case "6":
+                    // Show summary and confirm
+                    if (await ConfirmAndSaveChangesAsync(workingProfile, changes))
+                    {
+                        return workingProfile; // Saved successfully
+                    }
+                    break;
+                case "7":
+                    _transactionUserInteraction.ShowMessage("Changes discarded.");
+                    return null; // Cancelled
+                default:
+                    _transactionUserInteraction.ShowMessage($"Invalid option '{choice}'. Please select 1-7.\n");
+                    break;
+            }
+        }
+
+        return null;
+    }
+
+    private void EditProfileName(BudgetProfile workingProfile, BudgetProfile originalProfile, List<string> changes)
+    {
+        _transactionUserInteraction.ShowMessage($"\nCurrent name: {workingProfile.Name}");
+        _transactionUserInteraction.ShowMessage("Enter new name (or press Enter to keep): ");
+        string newName = _transactionUserInteraction.GetInput().Trim();
+
+        if (!string.IsNullOrEmpty(newName) && newName != workingProfile.Name)
+        {
+            changes.Add($"Name: '{workingProfile.Name}' → '{newName}'");
+            workingProfile.Name = newName;
+            _transactionUserInteraction.ShowMessage($"Name updated to: {newName}\n");
+        }
+        else
+        {
+            _transactionUserInteraction.ShowMessage("Name unchanged.\n");
+        }
+    }
+
+    private void EditUserName(BudgetProfile workingProfile, BudgetProfile originalProfile, List<string> changes)
+    {
+        _transactionUserInteraction.ShowMessage($"\nCurrent username: {workingProfile.UserName}");
+        _transactionUserInteraction.ShowMessage("Enter new username (or press Enter to keep): ");
+        string newUserName = _transactionUserInteraction.GetInput().Trim();
+
+        if (!string.IsNullOrEmpty(newUserName) && newUserName != workingProfile.UserName)
+        {
+            changes.Add($"Username: '{workingProfile.UserName}' → '{newUserName}'");
+            workingProfile.UserName = newUserName;
+            _transactionUserInteraction.ShowMessage($"Username updated to: {newUserName}\n");
+        }
+        else
+        {
+            _transactionUserInteraction.ShowMessage("Username unchanged.\n");
+        }
+    }
+
+    private void EditDescription(BudgetProfile workingProfile, BudgetProfile originalProfile, List<string> changes)
+    {
+        _transactionUserInteraction.ShowMessage($"\nCurrent description: {workingProfile.Description}");
+        _transactionUserInteraction.ShowMessage("Enter new description (or press Enter to keep): ");
+        string newDescription = _transactionUserInteraction.GetInput().Trim();
+
+        if (newDescription != workingProfile.Description) // Allow setting to empty
+        {
+            changes.Add($"Description: '{workingProfile.Description}' → '{newDescription}'");
+            workingProfile.Description = newDescription;
+            _transactionUserInteraction.ShowMessage($"Description updated to: {newDescription}\n");
+        }
+        else
+        {
+            _transactionUserInteraction.ShowMessage("Description unchanged.\n");
+        }
+    }
+
+    private void EditIncome(BudgetProfile workingProfile, BudgetProfile originalProfile, List<string> changes)
+    {
+        _transactionUserInteraction.ShowMessage($"\nCurrent income: ${workingProfile.Income.ToString("0.00")}");
+        _transactionUserInteraction.ShowMessage("Enter new income (or press Enter to keep): ");
+        string incomeInput = _transactionUserInteraction.GetInput().Trim();
+
+        if (!string.IsNullOrEmpty(incomeInput))
+        {
+            if (double.TryParse(incomeInput, out double newIncome))
+            {
+                if (newIncome != workingProfile.Income)
+                {
+                    changes.Add($"Income: ${workingProfile.Income.ToString("0.00")} → ${newIncome.ToString("0.00")}");
+                    workingProfile.Income = newIncome;
+                    _transactionUserInteraction.ShowMessage($"Income updated to: ${newIncome.ToString("0.00")}\n");
+                }
+                else
+                {
+                    _transactionUserInteraction.ShowMessage("Income unchanged.\n");
+                }
+            }
+            else
+            {
+                _transactionUserInteraction.ShowMessage($"Invalid amount '{incomeInput}'. Income unchanged.\n");
+            }
+        }
+        else
+        {
+            _transactionUserInteraction.ShowMessage("Income unchanged.\n");
+        }
+    }
+
+    private void EditCategories(BudgetProfile workingProfile, BudgetProfile originalProfile, List<string> changes)
+    {
+        bool editingCategories = true;
+        var categoryChanges = new List<string>();
+
+        while (editingCategories)
+        {
+            _transactionUserInteraction.ShowMessage("\n=== Edit Categories ===");
+
+            if (workingProfile.Categories.Count == 0)
+            {
+                _transactionUserInteraction.ShowMessage("No categories. Press 'a' to add categories.\n");
+            }
+            else
+            {
+                int index = 1;
+                foreach (var category in workingProfile.Categories.OrderBy(c => c.CategoryName))
+                {
+                    _transactionUserInteraction.ShowMessage($"{index}. {category.CategoryName}: ${category.BudgetAmount.ToString("0.00")}");
+                    index++;
+                }
+                _transactionUserInteraction.ShowMessage("");
+            }
+
+            _transactionUserInteraction.ShowMessage("Enter number to edit, 'a' to add, 'r' to remove, or Enter when done: ");
+            string choice = _transactionUserInteraction.GetInput().Trim().ToLower();
+
+            if (string.IsNullOrEmpty(choice))
+            {
+                // Done editing categories
+                editingCategories = false;
+
+                // Add category changes to main changes list
+                if (categoryChanges.Count > 0)
+                {
+                    changes.Add($"Categories: {categoryChanges.Count} changes");
+                    changes.AddRange(categoryChanges.Select(c => $"  - {c}"));
+                }
+            }
+            else if (choice == "a")
+            {
+                // Add new category
+                _transactionUserInteraction.ShowMessage("Enter category name: ");
+                string categoryName = _transactionUserInteraction.GetInput().Trim();
+
+                if (string.IsNullOrEmpty(categoryName))
+                {
+                    _transactionUserInteraction.ShowMessage("Category name cannot be empty.\n");
+                    continue;
+                }
+
+                // Check for duplicates (case-insensitive)
+                var existingCategory = workingProfile.Categories.FirstOrDefault(c =>
+                    c.CategoryName.Equals(categoryName, StringComparison.OrdinalIgnoreCase));
+
+                if (existingCategory != null)
+                {
+                    _transactionUserInteraction.ShowMessage($"Category '{categoryName}' already exists with amount ${existingCategory.BudgetAmount.ToString("0.00")}.\n");
+                    continue;
+                }
+
+                _transactionUserInteraction.ShowMessage("Enter budget amount: ");
+                string amountInput = _transactionUserInteraction.GetInput().Trim();
+
+                if (double.TryParse(amountInput, out double amount))
+                {
+                    workingProfile.Categories.Add(new BudgetCategory
+                    {
+                        CategoryName = categoryName,
+                        BudgetAmount = amount
+                    });
+                    categoryChanges.Add($"Added '{categoryName}': ${amount.ToString("0.00")}");
+                    _transactionUserInteraction.ShowMessage($"Category '{categoryName}' added with amount ${amount.ToString("0.00")}\n");
+                }
+                else
+                {
+                    _transactionUserInteraction.ShowMessage($"Invalid amount '{amountInput}'.\n");
+                }
+            }
+            else if (choice == "r")
+            {
+                // Remove category
+                if (workingProfile.Categories.Count == 0)
+                {
+                    _transactionUserInteraction.ShowMessage("No categories to remove.\n");
+                    continue;
+                }
+
+                _transactionUserInteraction.ShowMessage("Enter number of category to remove: ");
+                string numberInput = _transactionUserInteraction.GetInput().Trim();
+
+                if (int.TryParse(numberInput, out int categoryNumber) &&
+                    categoryNumber >= 1 && categoryNumber <= workingProfile.Categories.Count)
+                {
+                    var categoryToRemove = workingProfile.Categories
+                        .OrderBy(c => c.CategoryName)
+                        .ElementAt(categoryNumber - 1);
+
+                    workingProfile.Categories.Remove(categoryToRemove);
+                    categoryChanges.Add($"Removed '{categoryToRemove.CategoryName}': ${categoryToRemove.BudgetAmount.ToString("0.00")}");
+                    _transactionUserInteraction.ShowMessage($"Category '{categoryToRemove.CategoryName}' removed.\n");
+                }
+                else
+                {
+                    _transactionUserInteraction.ShowMessage($"Invalid category number '{numberInput}'.\n");
+                }
+            }
+            else if (int.TryParse(choice, out int editNumber) &&
+                     editNumber >= 1 && editNumber <= workingProfile.Categories.Count)
+            {
+                // Edit existing category amount
+                var categoryToEdit = workingProfile.Categories
+                    .OrderBy(c => c.CategoryName)
+                    .ElementAt(editNumber - 1);
+
+                _transactionUserInteraction.ShowMessage($"\nCurrent amount for '{categoryToEdit.CategoryName}': ${categoryToEdit.BudgetAmount.ToString("0.00")}");
+                _transactionUserInteraction.ShowMessage("Enter new amount (or press Enter to keep): ");
+                string amountInput = _transactionUserInteraction.GetInput().Trim();
+
+                if (!string.IsNullOrEmpty(amountInput))
+                {
+                    if (double.TryParse(amountInput, out double newAmount))
+                    {
+                        if (newAmount != categoryToEdit.BudgetAmount)
+                        {
+                            categoryChanges.Add($"'{categoryToEdit.CategoryName}': ${categoryToEdit.BudgetAmount.ToString("0.00")} → ${newAmount.ToString("0.00")}");
+                            categoryToEdit.BudgetAmount = newAmount;
+                            _transactionUserInteraction.ShowMessage($"Amount updated to ${newAmount.ToString("0.00")}\n");
+                        }
+                    }
+                    else
+                    {
+                        _transactionUserInteraction.ShowMessage($"Invalid amount '{amountInput}'.\n");
+                    }
+                }
+            }
+            else
+            {
+                _transactionUserInteraction.ShowMessage($"Invalid option '{choice}'.\n");
+            }
+        }
+    }
+
+    private async Task<bool> ConfirmAndSaveChangesAsync(BudgetProfile profile, List<string> changes)
+    {
+        if (changes.Count == 0)
+        {
+            _transactionUserInteraction.ShowMessage("\nNo changes were made.\n");
+            return false;
+        }
+
+        _transactionUserInteraction.ShowMessage("\n" + new string('=', 50));
+        _transactionUserInteraction.ShowMessage("=== Changes Summary ===");
+        foreach (var change in changes)
+        {
+            _transactionUserInteraction.ShowMessage(change);
+        }
+        _transactionUserInteraction.ShowMessage(new string('=', 50));
+
+        _transactionUserInteraction.ShowMessage("\nSave these changes? (y/n): ");
+        string confirm = _transactionUserInteraction.GetInput().Trim().ToLower();
+
+        if (confirm == "y" || confirm == "yes")
+        {
+            try
+            {
+                await StoreProfileAsync(profile);
+                _transactionUserInteraction.ShowMessage("\nProfile updated successfully!\n");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _transactionUserInteraction.ShowMessage($"\nError saving profile: {ex.Message}\n");
+                return false;
+            }
+        }
+        else
+        {
+            _transactionUserInteraction.ShowMessage("\nChanges not saved.\n");
+            return false;
+        }
+    }
 }

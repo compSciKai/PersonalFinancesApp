@@ -57,14 +57,40 @@ public class DatabaseBudgetRepository : IBudgetRepository
             existing.Income = profile.Income;
             existing.UpdatedDate = DateTime.UtcNow;
 
-            // Remove old categories
-            _context.BudgetCategories.RemoveRange(existing.Categories);
-
-            // Add new categories
-            foreach (var category in profile.Categories)
+            // Delta update: only modify what changed
+            // 1. Remove categories that no longer exist
+            var categoriesToRemove = existing.Categories
+                .Where(ec => !profile.Categories.Any(pc =>
+                    string.Equals(pc.CategoryName, ec.CategoryName, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            foreach (var categoryToRemove in categoriesToRemove)
             {
-                category.BudgetProfileId = existing.Id;
-                existing.Categories.Add(category);
+                existing.Categories.Remove(categoryToRemove);
+            }
+
+            // 2. Update existing categories or add new ones
+            foreach (var newCategory in profile.Categories)
+            {
+                var existingCategory = existing.Categories
+                    .FirstOrDefault(ec => string.Equals(ec.CategoryName, newCategory.CategoryName, StringComparison.OrdinalIgnoreCase));
+
+                if (existingCategory != null)
+                {
+                    // Update existing category amount if changed
+                    existingCategory.BudgetAmount = newCategory.BudgetAmount;
+                    existingCategory.UpdatedDate = DateTime.UtcNow;
+                }
+                else
+                {
+                    // Add new category
+                    existing.Categories.Add(new BudgetCategory
+                    {
+                        CategoryName = newCategory.CategoryName,
+                        BudgetAmount = newCategory.BudgetAmount,
+                        BudgetProfileId = existing.Id,
+                        CreatedDate = DateTime.UtcNow
+                    });
+                }
             }
 
             _context.BudgetProfiles.Update(existing);
