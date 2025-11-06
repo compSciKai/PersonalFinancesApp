@@ -219,7 +219,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     public KeyValuePair<string, string>? PromptForVendorKVP(string description)
     {
         bool invalidVendorInput = true;
-        string vendorKey = ""; 
+        string vendorKey = "";
         string vendorValue = "";
 
         ShowMessage(
@@ -227,15 +227,22 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
         while (invalidVendorInput)
         {
-            ShowMessage("Enter a string from the description that will identify the vendor for this transaction, or type 's' to skip");
+            ShowMessage($"Enter a string from the description that will identify the vendor for this transaction,");
+            ShowMessage($"or press Enter to save as '{description}', or type 's' to skip");
             vendorKey = GetInput();
-            
+
             if (vendorKey == "s")
             {
                 return null;
             }
 
-            if (vendorKey is not "" && description.ToLower().Contains(vendorKey.ToLower()))
+            // If user presses Enter, use the full description
+            if (string.IsNullOrEmpty(vendorKey))
+            {
+                return new KeyValuePair<string, string>(description.ToLower(), description.ToLower());
+            }
+
+            if (description.ToLower().Contains(vendorKey.ToLower()))
             {
                 ShowMessage($"What is the vendor's name for this transaction? Press enter to save as '{vendorKey}'");
                 vendorValue = GetInput();
@@ -245,9 +252,9 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                     vendorValue = vendorKey;
                 }
 
-                invalidVendorInput = false; 
+                invalidVendorInput = false;
             }
-            else 
+            else
             {
                 ShowMessage("That vendor is not present in the description. Try again.");
             }
@@ -259,7 +266,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
     public KeyValuePair<string, string>? PromptForCategoryKVP(string vendor)
     {
         bool invalidCategoryInput = true;
-        string categoryKey = ""; 
+        string categoryKey = "";
         string categoryValue = "";
 
         ShowMessage(
@@ -267,15 +274,22 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
         while (invalidCategoryInput)
         {
-            ShowMessage("Enter a string from the vendor that will identify the category for this vendor, or type 's' to skip");
+            ShowMessage($"Enter a string from the vendor that will identify the category for this vendor,");
+            ShowMessage($"or press Enter to save as '{vendor}', or type 's' to skip");
             categoryKey = GetInput();
-            
+
             if (categoryKey == "s")
             {
                 return null;
             }
 
-            if (!string.IsNullOrEmpty(categoryKey) && vendor.ToLower().Contains(categoryKey.ToLower()))
+            // If user presses Enter, use the full vendor name
+            if (string.IsNullOrEmpty(categoryKey))
+            {
+                return new KeyValuePair<string, string>(vendor.ToLower(), vendor.ToLower());
+            }
+
+            if (vendor.ToLower().Contains(categoryKey.ToLower()))
             {
                 ShowMessage($"What is the category for this vendor? Press enter to save as '{categoryKey}'");
                 categoryValue = GetInput();
@@ -285,9 +299,9 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                     categoryValue = categoryKey;
                 }
 
-                invalidCategoryInput = false; 
+                invalidCategoryInput = false;
             }
-            else 
+            else
             {
                 ShowMessage("That value is not present in the vendor name. Try again.");
             }

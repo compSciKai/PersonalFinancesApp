@@ -191,10 +191,22 @@ class PersonalFinancesApp
         _transactionUserInteraction.ShowMessage(profile.ToString());
         _transactionUserInteraction.ShowMessage($"\nBudget Total: ${budgetTotal.ToString("0.00")}");
 
-        _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, 'c' for category cleanup, or Enter to continue...");
-        string userInput = _transactionUserInteraction.GetInput().Trim().ToLower();
+        _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+        _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
+        _transactionUserInteraction.ShowMessage("2. Edit profile");
+        _transactionUserInteraction.ShowMessage("3. Category cleanup");
+        _transactionUserInteraction.ShowMessage("4. Quit\n");
 
-        if (userInput == "e")
+        string userInput = _transactionUserInteraction.GetInput().Trim();
+
+        // Input validation
+        if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+        {
+            _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
+            userInput = "1";
+        }
+
+        if (userInput == "2")
         {
             // Edit loop
             bool continueEditing = true;
@@ -216,10 +228,22 @@ class PersonalFinancesApp
                     _transactionUserInteraction.ShowMessage(new string('=', 50) + "\n");
 
                     // Ask again
-                    _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, 'c' for category cleanup, or Enter to continue...");
-                    userInput = _transactionUserInteraction.GetInput().Trim().ToLower();
+                    _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+                    _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
+                    _transactionUserInteraction.ShowMessage("2. Edit profile");
+                    _transactionUserInteraction.ShowMessage("3. Category cleanup");
+                    _transactionUserInteraction.ShowMessage("4. Quit\n");
 
-                    if (userInput != "e" && userInput != "c")
+                    userInput = _transactionUserInteraction.GetInput().Trim();
+
+                    // Input validation
+                    if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+                    {
+                        _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
+                        userInput = "1";
+                    }
+
+                    if (userInput != "2" && userInput != "3")
                     {
                         continueEditing = false;
                     }
@@ -231,22 +255,34 @@ class PersonalFinancesApp
             }
         }
 
-        if (userInput == "c")
+        if (userInput == "3")
         {
             // Category cleanup
             await _categoriesService.RunCategoryCleanupAsync(profile);
 
-            // After cleanup, show profile again
-            _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, 'c' for category cleanup, or Enter to continue...");
-            userInput = _transactionUserInteraction.GetInput().Trim().ToLower();
+            // After cleanup, show menu again
+            _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+            _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
+            _transactionUserInteraction.ShowMessage("2. Edit profile");
+            _transactionUserInteraction.ShowMessage("3. Category cleanup");
+            _transactionUserInteraction.ShowMessage("4. Quit\n");
 
-            if (userInput == "q")
+            userInput = _transactionUserInteraction.GetInput().Trim();
+
+            // Input validation
+            if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+            {
+                _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
+                userInput = "1";
+            }
+
+            if (userInput == "4")
             {
                 _transactionUserInteraction.Exit();
             }
         }
 
-        if (userInput == "q")
+        if (userInput == "4")
         {
             _transactionUserInteraction.Exit();
         }
