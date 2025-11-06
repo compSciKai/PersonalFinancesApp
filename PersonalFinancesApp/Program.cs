@@ -1,17 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query.Internal;
-using Microsoft.Extensions.Options;
-using PersonalFinances.App;
+﻿using PersonalFinances.App;
 using PersonalFinances.Data;
 using PersonalFinances.Models;
 using PersonalFinances.Repositories;
-using System;
-using System.Collections.Generic;
 
-string vendersJsonPath = @"";
-string categoriesJsonPath = @"";
-string BudgetProfilesJsonPath = @"";
-string currentProfile = "";
 
 // Transactions Paths
 var transactionsDictionary = new Dictionary<string, Type>
@@ -19,22 +10,39 @@ var transactionsDictionary = new Dictionary<string, Type>
     { @"", typeof(RBCTransaction) },
     { @"", typeof(AmexTransaction) }
 };
+   
 
-TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.All;
+TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;
 
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 var entities = new TransactionContext();
 
+// Initialize repositories
+var vendorsDbRepo = new DatabaseVendorsRepository(entities);
+var categoriesDbRepo = new DatabaseCategoriesRepository(entities);
+
+// Initialize services
 var budgetService = new BudgetService(
     new DatabaseBudgetRepository(entities),
     TransactionsConsoleUserInteraction,
-    new BudgetRepository(BudgetProfilesJsonPath));
+    null); // JSON repository removed for budget profiles
 
-// Check for migration command
-if (args.Length > 0 && args[0] == "migrate-profiles")
+var vendorsService = new VendorsService(
+    vendorsDbRepo,
+    null,
+    TransactionsConsoleUserInteraction);
+
+var categoriesService = new CategoriesService(
+    categoriesDbRepo,
+    null,
+    TransactionsConsoleUserInteraction);
+
+// Check for migration commands
+if (args.Length > 0 && args[0] == "migrate-mappings")
 {
-    Console.WriteLine("Running profile migration from JSON to database...\n");
-    await budgetService.MigrateProfilesToDatabaseAsync();
+    Console.WriteLine("Running vendor and category mapping migration from JSON to database...\n");
+    await vendorsService.MigrateVendorsFromJsonAsync();
+    await categoriesService.MigrateCategoriesFromJsonAsync();
     Console.WriteLine("\nMigration complete. Press any key to exit...");
     Console.ReadKey();
     return;
@@ -48,13 +56,9 @@ var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     new SqlServerTransactionRepository<AmexTransaction>(entities),
     new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
     TransactionsConsoleUserInteraction,
-    new VendorsService(
-        new VendorsRepository(vendersJsonPath),
-        TransactionsConsoleUserInteraction),
-    new CategoriesService(
-        new CategoriesRepository(categoriesJsonPath),
-        TransactionsConsoleUserInteraction),
+    vendorsService,
+    categoriesService,
     budgetService
 );
 
-await FinancesApp.RunAsync(transactionsDictionary, transactionRange, currentProfile);
+await FinancesApp.RunAsync(transactionsDictionary, transactionRange);

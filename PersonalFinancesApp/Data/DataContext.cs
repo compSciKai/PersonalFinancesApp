@@ -10,6 +10,8 @@ public class  TransactionContext : DbContext
     public DbSet<PCFinancialTransaction> PCTransactions { get; set; }
     public DbSet<BudgetProfile> BudgetProfiles { get; set; }
     public DbSet<BudgetCategory> BudgetCategories { get; set; }
+    public DbSet<VendorMapping> VendorMappings { get; set; }
+    public DbSet<Category> Categories { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
@@ -78,6 +80,34 @@ public class  TransactionContext : DbContext
             entity.HasIndex(c => new { c.BudgetProfileId, c.CategoryName })
                   .IsUnique()
                   .HasDatabaseName("IX_BudgetCategory_ProfileId_CategoryName");
+        });
+
+        modelBuilder.Entity<VendorMapping>(entity =>
+        {
+            entity.ToTable("VendorMappings");
+            entity.Property(v => v.Pattern).HasMaxLength(200).IsRequired();
+            entity.Property(v => v.VendorName).HasMaxLength(200).IsRequired();
+
+            // Create index on Pattern for fast lookups
+            entity.HasIndex(v => v.Pattern).HasDatabaseName("IX_VendorMapping_Pattern");
+
+            // Configure optional relationship to Category
+            entity.HasOne(v => v.Category)
+                  .WithMany(c => c.Vendors)
+                  .HasForeignKey(v => v.CategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.ToTable("Categories");
+            entity.Property(c => c.CategoryName).HasMaxLength(100).IsRequired();
+            entity.Property(c => c.Description).HasMaxLength(500);
+
+            // Create unique index on CategoryName
+            entity.HasIndex(c => c.CategoryName)
+                  .IsUnique()
+                  .HasDatabaseName("IX_Category_CategoryName");
         });
     }
 }

@@ -37,10 +37,17 @@ public class BudgetService : IBudgetService
     public async Task StoreProfileAsync(BudgetProfile profile)
     {
         var existing = await GetProfileAsync(profile.Name);
-        if (existing is not null && existing.Id != profile.Id)
+        // Reject duplicate names:
+        // - For new profiles (Id == 0): reject if any profile with that name exists
+        // - For existing profiles (Id != 0): reject if a different profile with that name exists
+        if (existing is not null)
         {
-            _transactionUserInteraction.ShowMessage($"Profile with name {profile.Name} already exists.");
-            return;
+            // If saving a new profile (Id == 0) or updating a different profile
+            if (profile.Id == 0 || existing.Id != profile.Id)
+            {
+                _transactionUserInteraction.ShowMessage($"Profile with name {profile.Name} already exists.");
+                return;
+            }
         }
 
         // Validate categories for duplicates

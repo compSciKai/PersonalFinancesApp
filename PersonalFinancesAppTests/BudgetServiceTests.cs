@@ -193,8 +193,8 @@ namespace PersonalFinancesAppTests
 
             var profile = await _cut.GetProfileAsync("TestProfile");
 
-            profile.BudgetCategories.Add("Food", 300);
-            profile.BudgetCategories.Add("Transport", 200);
+            profile.Categories.Add(new BudgetCategory("Food", 300));
+            profile.Categories.Add(new BudgetCategory("Transport", 200));
 
             double total = profile.BudgetCategories.Values.Sum();
             Assert.That(total, Is.EqualTo(500));
