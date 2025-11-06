@@ -191,7 +191,7 @@ class PersonalFinancesApp
         _transactionUserInteraction.ShowMessage(profile.ToString());
         _transactionUserInteraction.ShowMessage($"\nBudget Total: ${budgetTotal.ToString("0.00")}");
 
-        _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, or Enter to continue...");
+        _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, 'c' for category cleanup, or Enter to continue...");
         string userInput = _transactionUserInteraction.GetInput().Trim().ToLower();
 
         if (userInput == "e")
@@ -216,10 +216,10 @@ class PersonalFinancesApp
                     _transactionUserInteraction.ShowMessage(new string('=', 50) + "\n");
 
                     // Ask again
-                    _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, or Enter to continue...");
+                    _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, 'c' for category cleanup, or Enter to continue...");
                     userInput = _transactionUserInteraction.GetInput().Trim().ToLower();
 
-                    if (userInput != "e")
+                    if (userInput != "e" && userInput != "c")
                     {
                         continueEditing = false;
                     }
@@ -228,6 +228,21 @@ class PersonalFinancesApp
                 {
                     continueEditing = false;
                 }
+            }
+        }
+
+        if (userInput == "c")
+        {
+            // Category cleanup
+            await _categoriesService.RunCategoryCleanupAsync(profile);
+
+            // After cleanup, show profile again
+            _transactionUserInteraction.ShowMessage("\nPress 'q' to quit, 'e' to edit profile, 'c' for category cleanup, or Enter to continue...");
+            userInput = _transactionUserInteraction.GetInput().Trim().ToLower();
+
+            if (userInput == "q")
+            {
+                _transactionUserInteraction.Exit();
             }
         }
 

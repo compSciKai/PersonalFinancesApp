@@ -12,4 +12,5 @@ public interface ICategoriesService
     List<Transaction> OverrideCategories(List<Transaction> transactions, string categoryToOverride, string newCategory);
     Task MigrateCategoriesFromJsonAsync();
     Task MigrateMappingsAsync();
+    Task RunCategoryCleanupAsync(BudgetProfile profile);
 }
