@@ -426,6 +426,11 @@ public class BudgetService : IBudgetService
         {
             _transactionUserInteraction.ShowMessage("\n=== Edit Categories ===");
 
+            // Display budget summary
+            double categoryTotal = workingProfile.Categories.Sum(c => c.BudgetAmount);
+            double remaining = workingProfile.Income - categoryTotal;
+            _transactionUserInteraction.ShowMessage($"Income: ${workingProfile.Income:0.00} | Allocated: ${categoryTotal:0.00} | Remaining: ${remaining:0.00}\n");
+
             if (workingProfile.Categories.Count == 0)
             {
                 _transactionUserInteraction.ShowMessage("No categories. Press 'a' to add categories.\n");
@@ -483,6 +488,16 @@ public class BudgetService : IBudgetService
 
                 if (double.TryParse(amountInput, out double amount))
                 {
+                    // Validate against remaining budget
+                    double currentTotal = workingProfile.Categories.Sum(c => c.BudgetAmount);
+                    double remainingBudget = workingProfile.Income - currentTotal;
+
+                    if (amount > remainingBudget)
+                    {
+                        _transactionUserInteraction.ShowMessage($"Cannot add category. Amount ${amount:0.00} exceeds remaining budget of ${remainingBudget:0.00}.\n");
+                        continue;
+                    }
+
                     workingProfile.Categories.Add(new BudgetCategory
                     {
                         CategoryName = categoryName,
@@ -542,6 +557,18 @@ public class BudgetService : IBudgetService
                     {
                         if (newAmount != categoryToEdit.BudgetAmount)
                         {
+                            // Validate against remaining budget
+                            double totalWithoutThisCategory = workingProfile.Categories
+                                .Where(c => c != categoryToEdit)
+                                .Sum(c => c.BudgetAmount);
+
+                            if (totalWithoutThisCategory + newAmount > workingProfile.Income)
+                            {
+                                double maxAllowed = workingProfile.Income - totalWithoutThisCategory;
+                                _transactionUserInteraction.ShowMessage($"Cannot update amount. New total would exceed income. Maximum allowed: ${maxAllowed:0.00}\n");
+                                continue;
+                            }
+
                             categoryChanges.Add($"'{categoryToEdit.CategoryName}': ${categoryToEdit.BudgetAmount.ToString("0.00")} → ${newAmount.ToString("0.00")}");
                             categoryToEdit.BudgetAmount = newAmount;
                             _transactionUserInteraction.ShowMessage($"Amount updated to ${newAmount.ToString("0.00")}\n");

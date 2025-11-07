@@ -65,7 +65,7 @@ public class CategoriesService : ICategoriesService
         }
     }
 
-    public async Task<List<Transaction>> AddCategoriesToTransactionsAsync(List<Transaction> transactions)
+    public async Task<List<Transaction>> AddCategoriesToTransactionsAsync(List<Transaction> transactions, BudgetProfile? profile, IBudgetService? budgetService)
     {
         bool skipAll = false;
 
@@ -77,7 +77,7 @@ public class CategoriesService : ICategoriesService
 
                 if (categoryName == "" && !skipAll)
                 {
-                    var (categoryKVP, skipAllFlag) = _transactionUserInteraction.PromptForCategoryKVP(transaction.Vendor);
+                    var (categoryKVP, skipAllFlag, addToBudget) = _transactionUserInteraction.PromptForCategoryKVP(transaction.Vendor, profile);
 
                     if (skipAllFlag)
                     {
@@ -92,6 +92,25 @@ public class CategoriesService : ICategoriesService
 
                     await StoreNewCategoryAsync(categoryKVP?.Key, categoryKVP?.Value);
                     categoryName = categoryKVP?.Value;
+
+                    // Handle adding to budget if requested
+                    if (addToBudget && profile != null && budgetService != null)
+                    {
+                        // Calculate remaining budget
+                        double allocatedBudget = profile.BudgetCategories.Values.Sum();
+                        double remainingBudget = profile.Income - allocatedBudget;
+
+                        // Prompt for budget amount
+                        double budgetAmount = _transactionUserInteraction.PromptForBudgetAmount(categoryName, remainingBudget);
+
+                        // Add to profile
+                        profile.BudgetCategories[categoryName] = budgetAmount;
+
+                        // Save profile
+                        await budgetService.StoreProfileAsync(profile);
+
+                        _transactionUserInteraction.ShowMessage($"\nAdded '{categoryName}' to budget with amount ${budgetAmount:0.00}");
+                    }
                 }
 
                 transaction.Category = categoryName;

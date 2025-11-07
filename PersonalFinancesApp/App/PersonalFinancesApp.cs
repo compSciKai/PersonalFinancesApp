@@ -329,7 +329,7 @@ class PersonalFinancesApp
 
         // construct list of transactions and handler dictionary, iterate over
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(allTransactions);
-        List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors);
+        List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors, profile, _budgetService);
         List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
 
         if (profile.UserName != null)
@@ -356,6 +356,16 @@ class PersonalFinancesApp
             {
                 _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
             }
+        }
+
+        // Output uncategorized transactions section
+        List<Transaction> uncategorizedTransactions = filteredTransactions
+            .Where(t => string.IsNullOrEmpty(t.Category))
+            .ToList();
+
+        if (uncategorizedTransactions.Any())
+        {
+            _transactionUserInteraction.OutputTransactions(uncategorizedTransactions, "Uncategorized", null);
         }
 
         // Output Budget Vs Actual Spending Totals

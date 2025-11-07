@@ -268,14 +268,27 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         return (new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue.ToLower()), false);
     }
 
-    public (KeyValuePair<string, string>? kvp, bool skipAll) PromptForCategoryKVP(string vendor)
+    public (KeyValuePair<string, string>? kvp, bool skipAll, bool addToBudget) PromptForCategoryKVP(string vendor, BudgetProfile? profile)
     {
         bool invalidCategoryInput = true;
         string categoryKey = "";
         string categoryValue = "";
+        bool addToBudget = false;
 
-        ShowMessage(
-        $"Category could not be found for this vendor: '{vendor}'.");
+        ShowMessage($"\nCategory could not be found for this vendor: '{vendor}'.");
+
+        // Show autocomplete suggestions (Phase 3)
+        if (profile != null && profile.BudgetCategories.Any())
+        {
+            ShowMessage("\nYour budget categories:");
+            int index = 1;
+            foreach (var category in profile.BudgetCategories.Keys.OrderBy(c => c))
+            {
+                ShowMessage($"  {index}. {category}");
+                index++;
+            }
+            ShowMessage("");
+        }
 
         while (invalidCategoryInput)
         {
@@ -285,12 +298,12 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
             if (categoryKey == "s")
             {
-                return (null, false);
+                return (null, false, false);
             }
 
             if (categoryKey == "sa")
             {
-                return (null, true);
+                return (null, true, false);
             }
 
             // If user presses Enter, use the full vendor name as the pattern
@@ -309,6 +322,51 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                     categoryValue = categoryKey;
                 }
 
+                // Phase 2: Validate against budget profile
+                if (profile != null)
+                {
+                    // Check for case-insensitive match
+                    var matchingCategory = profile.BudgetCategories.Keys
+                        .FirstOrDefault(c => c.Equals(categoryValue, StringComparison.OrdinalIgnoreCase));
+
+                    if (matchingCategory != null && !matchingCategory.Equals(categoryValue))
+                    {
+                        // Found a case-insensitive match - suggest it
+                        ShowMessage($"\nDid you mean '{matchingCategory}'? (y/n)");
+                        string response = GetInput().Trim().ToLower();
+
+                        if (response == "y" || response == "yes" || string.IsNullOrEmpty(response))
+                        {
+                            categoryValue = matchingCategory;
+                        }
+                    }
+                    else if (matchingCategory == null)
+                    {
+                        // Category not found in budget - show all categories and prompt to add
+                        ShowMessage($"\nCategory '{categoryValue}' not found in budget.");
+                        ShowMessage("Your current budget categories are:");
+                        foreach (var cat in profile.BudgetCategories.Keys.OrderBy(c => c))
+                        {
+                            ShowMessage($"  - {cat}");
+                        }
+                        ShowMessage($"\nWould you like to add '{categoryValue}' to your budget? (y/n/s/sa)");
+                        string addResponse = GetInput().Trim().ToLower();
+
+                        if (addResponse == "y" || addResponse == "yes")
+                        {
+                            addToBudget = true;
+                        }
+                        else if (addResponse == "s")
+                        {
+                            return (null, false, false);
+                        }
+                        else if (addResponse == "sa")
+                        {
+                            return (null, true, false);
+                        }
+                    }
+                }
+
                 invalidCategoryInput = false;
             }
             else
@@ -317,7 +375,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             }
         }
 
-        return (new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower()), false);
+        return (new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower()), false, addToBudget);
     }
     public void OutputBudgetVsActual(List<Transaction> transactions, BudgetProfile? profile)
     {
@@ -367,5 +425,37 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         finalTable.Columns["Difference"].SetDataAlignment(TextAlignment.Right);
 
         Console.WriteLine(finalTable.ToPrettyPrintedString());
+    }
+
+    public double PromptForBudgetAmount(string categoryName, double remainingBudget)
+    {
+        ShowMessage($"\nRemaining budget available: ${remainingBudget:0.00}");
+
+        while (true)
+        {
+            ShowMessage($"Enter budget amount for '{categoryName}': ");
+            string input = GetInput();
+
+            if (double.TryParse(input, out double amount))
+            {
+                if (amount <= 0)
+                {
+                    ShowMessage("Budget amount must be positive. Try again.");
+                    continue;
+                }
+
+                if (amount > remainingBudget)
+                {
+                    ShowMessage($"Amount exceeds remaining budget (${remainingBudget:0.00}). Try again.");
+                    continue;
+                }
+
+                return amount;
+            }
+            else
+            {
+                ShowMessage("Invalid input. Please enter a valid number.");
+            }
+        }
     }
 }
