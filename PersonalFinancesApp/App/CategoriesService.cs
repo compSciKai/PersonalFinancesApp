@@ -38,10 +38,20 @@ public class CategoriesService : ICategoriesService
         return CategoriesMap.Values.Distinct().ToList();
     }
 
-    public void StoreNewCategory(string key, string categoryName)
+    public async Task StoreNewCategoryAsync(string key, string categoryName)
     {
         CategoriesMap.Add(key, categoryName);
-        _categoriesRepository.SaveCategoriesMap(CategoriesMap);
+
+        // Use database repository async method
+        var dbRepo = _categoriesRepository as DatabaseCategoriesRepository;
+        if (dbRepo != null)
+        {
+            await dbRepo.SaveCategoryMappingAsync(key, categoryName);
+        }
+        else
+        {
+            _categoriesRepository.SaveCategoriesMap(CategoriesMap);
+        }
     }
 
     public void StoreNewCategories(Dictionary<string, string> newCategoryEntries)
@@ -55,23 +65,32 @@ public class CategoriesService : ICategoriesService
         }
     }
 
-    public List<Transaction> AddCategoriesToTransactions(List<Transaction> transactions)
+    public async Task<List<Transaction>> AddCategoriesToTransactionsAsync(List<Transaction> transactions)
     {
+        bool skipAll = false;
+
         foreach (var transaction in transactions)
         {
             if (transaction.Category is null)
             {
                 string? categoryName = GetCategory(transaction.Vendor);
 
-                if (categoryName == "")
+                if (categoryName == "" && !skipAll)
                 {
-                    KeyValuePair<string, string>? categoryKVP = _transactionUserInteraction.PromptForCategoryKVP(transaction.Vendor);
+                    var (categoryKVP, skipAllFlag) = _transactionUserInteraction.PromptForCategoryKVP(transaction.Vendor);
+
+                    if (skipAllFlag)
+                    {
+                        skipAll = true;
+                        continue;
+                    }
+
                     if (categoryKVP is null)
                     {
                         continue;
                     }
 
-                    StoreNewCategory(categoryKVP?.Key, categoryKVP?.Value);
+                    await StoreNewCategoryAsync(categoryKVP?.Key, categoryKVP?.Value);
                     categoryName = categoryKVP?.Value;
                 }
 

@@ -52,15 +52,24 @@ public class VendorsService : IVendorsService
 
     public List<Transaction> AddVendorsToTransactions(List<Transaction> transactions)
     {
+        bool skipAll = false;
+
         foreach (var transaction in transactions)
         {
             if (transaction.Vendor is null)
             {
                 string? vendorName = GetVendor(transaction.Description);
 
-                if (vendorName == "")
+                if (vendorName == "" && !skipAll)
                 {
-                    KeyValuePair<string, string>? vendorKVP = _transactionUserInteraction.PromptForVendorKVP(transaction.Description);
+                    var (vendorKVP, skipAllFlag) = _transactionUserInteraction.PromptForVendorKVP(transaction.Description);
+
+                    if (skipAllFlag)
+                    {
+                        skipAll = true;
+                        continue;
+                    }
+
                     if (vendorKVP is null)
                     {
                         continue;

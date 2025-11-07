@@ -82,13 +82,13 @@ namespace PersonalFinancesAppTests
         }
 
         [Test]
-        public void StoreNewCategory_AddsCategoryToMap()
+        public async Task StoreNewCategory_AddsCategoryToMap()
         {
             var categoriesMap = new Dictionary<string, string>();
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
             _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
-            
-            _cut.StoreNewCategory("netflix", "entertainment");
+
+            await _cut.StoreNewCategoryAsync("netflix", "entertainment");
 
             _categoriesRepositoryMock.Verify(repo => repo.SaveCategoriesMap(categoriesMap), Times.Once);
             Assert.That(categoriesMap, Contains.Key("netflix"));

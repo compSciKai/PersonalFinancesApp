@@ -329,7 +329,7 @@ class PersonalFinancesApp
 
         // construct list of transactions and handler dictionary, iterate over
         List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(allTransactions);
-        List<Transaction> transactionsWithCategories = _categoriesService.AddCategoriesToTransactions(transactionsWithVendors);
+        List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors);
         List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
 
         if (profile.UserName != null)

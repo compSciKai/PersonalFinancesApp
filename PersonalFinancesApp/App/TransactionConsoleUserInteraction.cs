@@ -216,7 +216,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         return transactionsTable;
     }
 
-    public KeyValuePair<string, string>? PromptForVendorKVP(string description)
+    public (KeyValuePair<string, string>? kvp, bool skipAll) PromptForVendorKVP(string description)
     {
         bool invalidVendorInput = true;
         string vendorKey = "";
@@ -228,18 +228,23 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         while (invalidVendorInput)
         {
             ShowMessage($"Enter a string from the description that will identify the vendor for this transaction,");
-            ShowMessage($"or press Enter to save as '{description}', or type 's' to skip");
+            ShowMessage($"or press Enter to save as '{description}', or type 's' to skip, or 'sa' to skip all");
             vendorKey = GetInput();
 
             if (vendorKey == "s")
             {
-                return null;
+                return (null, false);
+            }
+
+            if (vendorKey == "sa")
+            {
+                return (null, true);
             }
 
             // If user presses Enter, use the full description
             if (string.IsNullOrEmpty(vendorKey))
             {
-                return new KeyValuePair<string, string>(description.ToLower(), description.ToLower());
+                return (new KeyValuePair<string, string>(description.ToLower(), description.ToLower()), false);
             }
 
             if (description.ToLower().Contains(vendorKey.ToLower()))
@@ -260,10 +265,10 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             }
         }
 
-        return new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue.ToLower());
+        return (new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue.ToLower()), false);
     }
 
-    public KeyValuePair<string, string>? PromptForCategoryKVP(string vendor)
+    public (KeyValuePair<string, string>? kvp, bool skipAll) PromptForCategoryKVP(string vendor)
     {
         bool invalidCategoryInput = true;
         string categoryKey = "";
@@ -275,18 +280,23 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         while (invalidCategoryInput)
         {
             ShowMessage($"Enter a string from the vendor that will identify the category for this vendor,");
-            ShowMessage($"or press Enter to save as '{vendor}', or type 's' to skip");
+            ShowMessage($"or press Enter to use '{vendor}', or type 's' to skip, or 'sa' to skip all");
             categoryKey = GetInput();
 
             if (categoryKey == "s")
             {
-                return null;
+                return (null, false);
             }
 
-            // If user presses Enter, use the full vendor name
+            if (categoryKey == "sa")
+            {
+                return (null, true);
+            }
+
+            // If user presses Enter, use the full vendor name as the pattern
             if (string.IsNullOrEmpty(categoryKey))
             {
-                return new KeyValuePair<string, string>(vendor.ToLower(), vendor.ToLower());
+                categoryKey = vendor;
             }
 
             if (vendor.ToLower().Contains(categoryKey.ToLower()))
@@ -307,7 +317,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             }
         }
 
-        return new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower());
+        return (new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower()), false);
     }
     public void OutputBudgetVsActual(List<Transaction> transactions, BudgetProfile? profile)
     {
