@@ -41,15 +41,23 @@ public class CategoriesService : ICategoriesService
         return CategoriesMap.Values.Distinct().ToList();
     }
 
-    public async Task StoreNewCategoryAsync(string key, string categoryName)
+    public async Task StoreNewCategoryAsync(string vendorName, string categoryName)
     {
-        CategoriesMap.Add(key, categoryName);
+        // Add to in-memory map using vendorName as key
+        if (!CategoriesMap.ContainsKey(vendorName))
+        {
+            CategoriesMap.Add(vendorName, categoryName);
+        }
+        else
+        {
+            CategoriesMap[vendorName] = categoryName;
+        }
 
         // Use database repository async method
         var dbRepo = _categoriesRepository as DatabaseCategoriesRepository;
         if (dbRepo != null)
         {
-            await dbRepo.SaveCategoryMappingAsync(key, categoryName);
+            await dbRepo.SaveCategoryMappingAsync(vendorName, categoryName);
         }
         else
         {
@@ -93,7 +101,8 @@ public class CategoriesService : ICategoriesService
                         continue;
                     }
 
-                    await StoreNewCategoryAsync(categoryKVP?.Key, categoryKVP?.Value);
+                    // Use the actual vendor name (not the pattern from categoryKVP.Key) to link the category
+                    await StoreNewCategoryAsync(transaction.Vendor!, categoryKVP?.Value);
                     categoryName = categoryKVP?.Value;
 
                     // Handle adding to budget if requested

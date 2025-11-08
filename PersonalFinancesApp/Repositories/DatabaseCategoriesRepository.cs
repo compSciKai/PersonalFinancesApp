@@ -141,4 +141,19 @@ public class DatabaseCategoriesRepository : ICategoriesRepository
             .Select(c => c.CategoryName)
             .ToListAsync();
     }
+
+    public async Task<VendorMapping?> GetVendorMappingAsync(string vendorName)
+    {
+        return await _context.VendorMappings
+            .Include(v => v.Category)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(v => v.VendorName == vendorName);
+    }
+
+    public async Task<Category?> GetCategoryByNameAsync(string categoryName)
+    {
+        return await _context.Categories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.CategoryName == categoryName);
+    }
 }

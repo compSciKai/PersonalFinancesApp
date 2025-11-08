@@ -331,7 +331,7 @@ class PersonalFinancesApp
         // process transactions if missing fields
 
         // construct list of transactions and handler dictionary, iterate over
-        List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(allTransactions);
+        List<Transaction> transactionsWithVendors = await _vendorsService.AddVendorsToTransactionsAsync(allTransactions);
         List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors, profile, _budgetService);
         List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
 
