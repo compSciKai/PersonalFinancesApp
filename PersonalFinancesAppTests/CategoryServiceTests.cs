@@ -29,7 +29,7 @@ namespace PersonalFinancesAppTests
             };
 
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, _transactionUserInteractionMock.Object);
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
 
             var result = _cut.GetCategory("Amazon");
 
@@ -46,7 +46,7 @@ namespace PersonalFinancesAppTests
             };
 
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, _transactionUserInteractionMock.Object);
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
 
             var result = _cut.GetCategory("UnknownVendor");
 
@@ -64,7 +64,7 @@ namespace PersonalFinancesAppTests
             };
 
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, _transactionUserInteractionMock.Object);
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
 
             var result = _cut.GetAllCategories();
 
@@ -75,20 +75,20 @@ namespace PersonalFinancesAppTests
         public void GetAllCategories_ReturnsEmptyCategories()
         {
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(new Dictionary<string, string>());
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, _transactionUserInteractionMock.Object);
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
 
             var result = _cut.GetAllCategories();
             Assert.That(result, Is.Empty);
         }
 
         [Test]
-        public void StoreNewCategory_AddsCategoryToMap()
+        public async Task StoreNewCategory_AddsCategoryToMap()
         {
             var categoriesMap = new Dictionary<string, string>();
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, _transactionUserInteractionMock.Object);
-            
-            _cut.StoreNewCategory("netflix", "entertainment");
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
+
+            await _cut.StoreNewCategoryAsync("netflix", "entertainment");
 
             _categoriesRepositoryMock.Verify(repo => repo.SaveCategoriesMap(categoriesMap), Times.Once);
             Assert.That(categoriesMap, Contains.Key("netflix"));

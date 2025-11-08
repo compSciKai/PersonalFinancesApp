@@ -12,11 +12,11 @@ public class BudgetRepository : IBudgetRepository
         _jsonFilePath = jsonFilePath;
     }
 
-    public List<BudgetProfile> LoadBudgetProfiles()
+    public async Task<List<BudgetProfile>> LoadBudgetProfilesAsync()
     {
         if (File.Exists(_jsonFilePath))
         {
-            string json = File.ReadAllText(_jsonFilePath);
+            string json = await File.ReadAllTextAsync(_jsonFilePath);
             if (json != "")
             {
                 var profiles = JsonSerializer.Deserialize<List<BudgetProfile>>(json);
@@ -30,10 +30,48 @@ public class BudgetRepository : IBudgetRepository
         return new List<BudgetProfile>();
     }
 
-    public void SaveBudgetProfiles(List<BudgetProfile> profiles)
+    public async Task SaveBudgetProfilesAsync(List<BudgetProfile> profiles)
     {
         var options = new JsonSerializerOptions { WriteIndented = true };
         var json = JsonSerializer.Serialize(profiles, options);
-        File.WriteAllText(_jsonFilePath, json); 
+        await File.WriteAllTextAsync(_jsonFilePath, json);
+    }
+
+    public async Task<BudgetProfile?> GetProfileByIdAsync(int id)
+    {
+        var profiles = await LoadBudgetProfilesAsync();
+        return profiles.FirstOrDefault(p => p.Id == id);
+    }
+
+    public async Task<BudgetProfile?> GetProfileByNameAsync(string name)
+    {
+        var profiles = await LoadBudgetProfilesAsync();
+        return profiles.FirstOrDefault(p => p.Name == name);
+    }
+
+    public async Task SaveBudgetProfileAsync(BudgetProfile profile)
+    {
+        var profiles = await LoadBudgetProfilesAsync();
+        var existing = profiles.FirstOrDefault(p => p.Id == profile.Id || p.Name == profile.Name);
+
+        if (existing != null)
+        {
+            profiles.Remove(existing);
+        }
+
+        profiles.Add(profile);
+        await SaveBudgetProfilesAsync(profiles);
+    }
+
+    public async Task DeleteBudgetProfileAsync(int id)
+    {
+        var profiles = await LoadBudgetProfilesAsync();
+        var profile = profiles.FirstOrDefault(p => p.Id == id);
+
+        if (profile != null)
+        {
+            profiles.Remove(profile);
+            await SaveBudgetProfilesAsync(profiles);
+        }
     }
 }

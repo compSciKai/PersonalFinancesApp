@@ -216,10 +216,10 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         return transactionsTable;
     }
 
-    public KeyValuePair<string, string>? PromptForVendorKVP(string description)
+    public (KeyValuePair<string, string>? kvp, bool skipAll) PromptForVendorKVP(string description)
     {
         bool invalidVendorInput = true;
-        string vendorKey = ""; 
+        string vendorKey = "";
         string vendorValue = "";
 
         ShowMessage(
@@ -227,15 +227,27 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
         while (invalidVendorInput)
         {
-            ShowMessage("Enter a string from the description that will identify the vendor for this transaction, or type 's' to skip");
+            ShowMessage($"Enter a string from the description that will identify the vendor for this transaction,");
+            ShowMessage($"or press Enter to save as '{description}', or type 's' to skip, or 'sa' to skip all");
             vendorKey = GetInput();
-            
+
             if (vendorKey == "s")
             {
-                return null;
+                return (null, false);
             }
 
-            if (vendorKey is not "" && description.ToLower().Contains(vendorKey.ToLower()))
+            if (vendorKey == "sa")
+            {
+                return (null, true);
+            }
+
+            // If user presses Enter, use the full description
+            if (string.IsNullOrEmpty(vendorKey))
+            {
+                return (new KeyValuePair<string, string>(description.ToLower(), description.ToLower()), false);
+            }
+
+            if (description.ToLower().Contains(vendorKey.ToLower()))
             {
                 ShowMessage($"What is the vendor's name for this transaction? Press enter to save as '{vendorKey}'");
                 vendorValue = GetInput();
@@ -245,37 +257,62 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                     vendorValue = vendorKey;
                 }
 
-                invalidVendorInput = false; 
+                invalidVendorInput = false;
             }
-            else 
+            else
             {
                 ShowMessage("That vendor is not present in the description. Try again.");
             }
         }
 
-        return new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue.ToLower());
+        return (new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue.ToLower()), false);
     }
 
-    public KeyValuePair<string, string>? PromptForCategoryKVP(string vendor)
+    public (KeyValuePair<string, string>? kvp, bool skipAll, bool addToBudget) PromptForCategoryKVP(string vendor, BudgetProfile? profile)
     {
         bool invalidCategoryInput = true;
-        string categoryKey = ""; 
+        string categoryKey = "";
         string categoryValue = "";
+        bool addToBudget = false;
 
-        ShowMessage(
-        $"Category could not be found for this vendor: '{vendor}'.");
+        ShowMessage($"\nCategory could not be found for this vendor: '{vendor}'.");
+
+        // Show autocomplete suggestions (Phase 3)
+        if (profile != null && profile.BudgetCategories.Any())
+        {
+            ShowMessage("\nYour budget categories:");
+            int index = 1;
+            foreach (var category in profile.BudgetCategories.Keys.OrderBy(c => c))
+            {
+                ShowMessage($"  {index}. {category}");
+                index++;
+            }
+            ShowMessage("");
+        }
 
         while (invalidCategoryInput)
         {
-            ShowMessage("Enter a string from the vendor that will identify the category for this vendor, or type 's' to skip");
+            ShowMessage($"Enter a string from the vendor that will identify the category for this vendor,");
+            ShowMessage($"or press Enter to use '{vendor}', or type 's' to skip, or 'sa' to skip all");
             categoryKey = GetInput();
-            
+
             if (categoryKey == "s")
             {
-                return null;
+                return (null, false, false);
             }
 
-            if (!string.IsNullOrEmpty(categoryKey) && vendor.ToLower().Contains(categoryKey.ToLower()))
+            if (categoryKey == "sa")
+            {
+                return (null, true, false);
+            }
+
+            // If user presses Enter, use the full vendor name as the pattern
+            if (string.IsNullOrEmpty(categoryKey))
+            {
+                categoryKey = vendor;
+            }
+
+            if (vendor.ToLower().Contains(categoryKey.ToLower()))
             {
                 ShowMessage($"What is the category for this vendor? Press enter to save as '{categoryKey}'");
                 categoryValue = GetInput();
@@ -285,15 +322,60 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                     categoryValue = categoryKey;
                 }
 
-                invalidCategoryInput = false; 
+                // Phase 2: Validate against budget profile
+                if (profile != null)
+                {
+                    // Check for case-insensitive match
+                    var matchingCategory = profile.BudgetCategories.Keys
+                        .FirstOrDefault(c => c.Equals(categoryValue, StringComparison.OrdinalIgnoreCase));
+
+                    if (matchingCategory != null && !matchingCategory.Equals(categoryValue))
+                    {
+                        // Found a case-insensitive match - suggest it
+                        ShowMessage($"\nDid you mean '{matchingCategory}'? (y/n)");
+                        string response = GetInput().Trim().ToLower();
+
+                        if (response == "y" || response == "yes" || string.IsNullOrEmpty(response))
+                        {
+                            categoryValue = matchingCategory;
+                        }
+                    }
+                    else if (matchingCategory == null)
+                    {
+                        // Category not found in budget - show all categories and prompt to add
+                        ShowMessage($"\nCategory '{categoryValue}' not found in budget.");
+                        ShowMessage("Your current budget categories are:");
+                        foreach (var cat in profile.BudgetCategories.Keys.OrderBy(c => c))
+                        {
+                            ShowMessage($"  - {cat}");
+                        }
+                        ShowMessage($"\nWould you like to add '{categoryValue}' to your budget? (y/n/s/sa)");
+                        string addResponse = GetInput().Trim().ToLower();
+
+                        if (addResponse == "y" || addResponse == "yes")
+                        {
+                            addToBudget = true;
+                        }
+                        else if (addResponse == "s")
+                        {
+                            return (null, false, false);
+                        }
+                        else if (addResponse == "sa")
+                        {
+                            return (null, true, false);
+                        }
+                    }
+                }
+
+                invalidCategoryInput = false;
             }
-            else 
+            else
             {
                 ShowMessage("That value is not present in the vendor name. Try again.");
             }
         }
 
-        return new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower());
+        return (new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower()), false, addToBudget);
     }
     public void OutputBudgetVsActual(List<Transaction> transactions, BudgetProfile? profile)
     {
@@ -343,5 +425,37 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         finalTable.Columns["Difference"].SetDataAlignment(TextAlignment.Right);
 
         Console.WriteLine(finalTable.ToPrettyPrintedString());
+    }
+
+    public double PromptForBudgetAmount(string categoryName, double remainingBudget)
+    {
+        ShowMessage($"\nRemaining budget available: ${remainingBudget:0.00}");
+
+        while (true)
+        {
+            ShowMessage($"Enter budget amount for '{categoryName}': ");
+            string input = GetInput();
+
+            if (double.TryParse(input, out double amount))
+            {
+                if (amount <= 0)
+                {
+                    ShowMessage("Budget amount must be positive. Try again.");
+                    continue;
+                }
+
+                if (amount > remainingBudget)
+                {
+                    ShowMessage($"Amount exceeds remaining budget (${remainingBudget:0.00}). Try again.");
+                    continue;
+                }
+
+                return amount;
+            }
+            else
+            {
+                ShowMessage("Invalid input. Please enter a valid number.");
+            }
+        }
     }
 }
