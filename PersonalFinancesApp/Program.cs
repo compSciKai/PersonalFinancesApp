@@ -23,6 +23,9 @@ var entities = new TransactionContext();
 var vendorsDbRepo = new DatabaseVendorsRepository(entities);
 var categoriesDbRepo = new DatabaseCategoriesRepository(entities);
 
+// Initialize transaction type detector
+var typeDetector = new TransactionTypeDetector();
+
 // Initialize services
 var budgetService = new BudgetService(
     new DatabaseBudgetRepository(entities),
@@ -37,7 +40,8 @@ var vendorsService = new VendorsService(
 var categoriesService = new CategoriesService(
     categoriesDbRepo,
     null,
-    TransactionsConsoleUserInteraction);
+    TransactionsConsoleUserInteraction,
+    typeDetector);
 
 // Check for migration commands
 if (args.Length > 0 && args[0] == "migrate-mappings")
