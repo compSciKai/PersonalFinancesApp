@@ -5,11 +5,13 @@ using PersonalFinances.Repositories;
 
 
 // Transactions Paths
-var transactionsDictionary = new Dictionary<string, Type>
-{
-    { @"", typeof(RBCTransaction) },
-    { @"", typeof(AmexTransaction) }
-};
+//var transactionsDictionary = new Dictionary<string, Type>
+//{
+//    { @"", typeof(RBCTransaction) },
+//    { @"", typeof(AmexTransaction) }
+//};
+
+Dictionary<string, Type> transactionsDictionary = null;
    
 
 TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.LastMonth;

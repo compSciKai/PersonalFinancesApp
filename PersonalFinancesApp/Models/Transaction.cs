@@ -23,6 +23,15 @@ public abstract class Transaction : BaseEntity
     public virtual bool isNegativeAmounts { get; } = true;
     public string TransactionHash { get; set; }
 
+    // Transaction type classification for budgeting
+    public TransactionType Type { get; set; } = TransactionType.Expense;
+
+    // For linking matched transfers between accounts
+    public string? LinkedTransactionId { get; set; }
+
+    // Indicates if this transfer has been matched and reconciled
+    public bool IsReconciledTransfer { get; set; } = false;
+
     public virtual void GenerateHash()
     {
         var hashInput = $"{Date:yyyy-MM-dd}|{Amount}|{Description}|{AccountType}";

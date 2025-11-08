@@ -288,30 +288,33 @@ class PersonalFinancesApp
         }
 
         // Get new transactions from CSV repository
-        foreach (var transactionEntry in transactionsDictionary)
+        if (transactionsDictionary != null)
         {
-            if (string.IsNullOrEmpty(transactionEntry.Key))
+            foreach (var transactionEntry in transactionsDictionary)
             {
-                continue; // Skip empty keys
-            }
-            else if (transactionEntry.Value == typeof(RBCTransaction))
-            {
-                var transactions = await _rbcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                await _rbcSqlRepository.SaveAsync(transactions);
-            }
-            else if (transactionEntry.Value == typeof(AmexTransaction))
-            {
-                var transactions = await _amexCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                await _amexSqlRepository.SaveAsync(transactions);
-            }
-            else if (transactionEntry.Value == typeof(PCFinancialTransaction))
-            {
-                var transactions = await _pcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                await _pcSqlRepository.SaveAsync(transactions);
-            }
-            else
-            {
-                throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
+                if (string.IsNullOrEmpty(transactionEntry.Key))
+                {
+                    continue; // Skip empty keys
+                }
+                else if (transactionEntry.Value == typeof(RBCTransaction))
+                {
+                    var transactions = await _rbcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                    await _rbcSqlRepository.SaveAsync(transactions);
+                }
+                else if (transactionEntry.Value == typeof(AmexTransaction))
+                {
+                    var transactions = await _amexCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                    await _amexSqlRepository.SaveAsync(transactions);
+                }
+                else if (transactionEntry.Value == typeof(PCFinancialTransaction))
+                {
+                    var transactions = await _pcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                    await _pcSqlRepository.SaveAsync(transactions);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
+                }
             }
         }
 
