@@ -8,15 +8,18 @@ public class CategoriesService : ICategoriesService
     ICategoriesRepository _categoriesRepository;
     ICategoriesRepository? _jsonRepository;
     ITransactionsUserInteraction _transactionUserInteraction;
+    TransactionTypeDetector _typeDetector;
 
     public CategoriesService(
         ICategoriesRepository categoriesRepository,
         ICategoriesRepository? jsonRepository,
-        ITransactionsUserInteraction transactionUserInteraction)
+        ITransactionsUserInteraction transactionUserInteraction,
+        TransactionTypeDetector typeDetector)
     {
         _categoriesRepository = categoriesRepository;
         _jsonRepository = jsonRepository;
         _transactionUserInteraction = transactionUserInteraction;
+        _typeDetector = typeDetector;
         CategoriesMap = categoriesRepository.LoadCategoriesMap();
     }
 
@@ -114,6 +117,24 @@ public class CategoriesService : ICategoriesService
                 }
 
                 transaction.Category = categoryName;
+
+                // Auto-detect transaction type if still default (Expense)
+                if (transaction.Type == TransactionType.Expense && transaction.Category != null)
+                {
+                    // Try to get VendorMapping from database for more accurate detection
+                    VendorMapping? vendorMapping = null;
+                    Category? categoryObj = null;
+
+                    var dbRepo = _categoriesRepository as DatabaseCategoriesRepository;
+                    if (dbRepo != null && transaction.Vendor != null)
+                    {
+                        vendorMapping = await dbRepo.GetVendorMappingAsync(transaction.Vendor);
+                        categoryObj = await dbRepo.GetCategoryByNameAsync(transaction.Category);
+                    }
+
+                    // Detect the transaction type
+                    transaction.Type = _typeDetector.DetectType(transaction, vendorMapping, categoryObj);
+                }
             }
         }
 

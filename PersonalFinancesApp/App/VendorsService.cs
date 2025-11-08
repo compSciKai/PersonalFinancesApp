@@ -33,10 +33,25 @@ public class VendorsService : IVendorsService
         return "";
     }
 
-    public void StoreNewVendor(string key, string vendorName)
+    public async Task StoreNewVendorAsync(string key, string vendorName)
     {
         VendorsMap.Add(key, vendorName);
-        _vendorsRepository.SaveVendorsMap(VendorsMap);
+
+        // Use database repository async method
+        var dbRepo = _vendorsRepository as DatabaseVendorsRepository;
+        if (dbRepo != null)
+        {
+            var vendorMapping = new VendorMapping
+            {
+                Pattern = key,
+                VendorName = vendorName
+            };
+            await dbRepo.SaveVendorMappingAsync(vendorMapping);
+        }
+        else
+        {
+            _vendorsRepository.SaveVendorsMap(VendorsMap);
+        }
     }
 
     public void StoreNewVendors(Dictionary<string, string> newVendorsEntries)
@@ -50,7 +65,7 @@ public class VendorsService : IVendorsService
         }
     }
 
-    public List<Transaction> AddVendorsToTransactions(List<Transaction> transactions)
+    public async Task<List<Transaction>> AddVendorsToTransactionsAsync(List<Transaction> transactions)
     {
         bool skipAll = false;
 
@@ -75,7 +90,7 @@ public class VendorsService : IVendorsService
                         continue;
                     }
 
-                    StoreNewVendor(vendorKVP?.Key, vendorKVP?.Value);
+                    await StoreNewVendorAsync(vendorKVP?.Key, vendorKVP?.Value);
                     vendorName = vendorKVP?.Value;
                 }
 
