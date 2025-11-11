@@ -35,15 +35,6 @@ public static class TransactionFilterService
         return transactions.Where(transaction => transaction.MemberName.ToLower().Contains(userName.ToLower()) || transaction.MemberName == string.Empty).ToList();
     }
 
-    // TODO: fix as student loan being removed
-    public static List<Transaction> GetSpendingTransactions(List<Transaction> transactions) {
-        return transactions.Where(transaction => {
-            return transaction.Vendor != "credit payment" &&
-            transaction.Vendor != "account transfer" &&
-            transaction.Category != "income";
-        }).ToList();
-    }
-
     private static DateTime LastDayOfLastMonth() 
     {
         DateTime firstDayofThisMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0);

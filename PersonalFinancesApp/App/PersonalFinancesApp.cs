@@ -381,43 +381,113 @@ class PersonalFinancesApp
 
         filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
 
-        //List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
-        List<Transaction> spendingTransactions = filteredTransactions;
-
         string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
         string tableName = rangeType is not null ? $"{rangeType} Transactions" : "Transactions";
 
+        // Get type-based transaction lists
+        var budgetedExpenses = GetBudgetedExpenses(filteredTransactions);
+        var trackedOnlyExpenses = GetTrackedOnlyExpenses(filteredTransactions);
+        var transfers = GetTransfers(filteredTransactions);
+        var income = GetIncome(filteredTransactions);
+        var adjustments = GetAdjustments(filteredTransactions);
 
-        // output information 
-        _transactionUserInteraction.OutputTransactions(spendingTransactions, tableName, null);
+        // Output all transactions overview
+        _transactionUserInteraction.OutputTransactions(filteredTransactions, tableName, null);
+
+        // === SECTION 1: BUDGET CATEGORIES ===
+        Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+        Console.WriteLine("                    BUDGET CATEGORIES");
+        Console.WriteLine("═══════════════════════════════════════════════════════════\n");
 
         foreach (string category in categories)
         {
-            List<Transaction> categorizedTransactions = filteredTransactions.Where(transaction => transaction.Category == category).ToList();
+            var categorizedTransactions = budgetedExpenses
+                .Where(transaction => transaction.Category == category)
+                .ToList();
 
-            if (profile.BudgetCategories.Any(c => c.Key.ToLower() == category.ToLower()))
+            if (profile.BudgetCategories.Any(c => c.Key.ToLower() == category.ToLower()) && categorizedTransactions.Any())
             {
                 _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
             }
         }
 
-        // Output uncategorized transactions section
-        List<Transaction> uncategorizedTransactions = filteredTransactions
-            .Where(t => string.IsNullOrEmpty(t.Category))
-            .ToList();
+        // Output Budget Vs Actual for budgeted categories only
+        _transactionUserInteraction.OutputBudgetVsActual(budgetedExpenses, profile);
 
-        if (uncategorizedTransactions.Any())
+        // === SECTION 2: FIXED OBLIGATIONS (Tracked Only) ===
+        if (trackedOnlyExpenses.Any())
         {
-            _transactionUserInteraction.OutputTransactions(uncategorizedTransactions, "Uncategorized", null);
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("              FIXED OBLIGATIONS (Tracked Only)");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            var trackedCategories = trackedOnlyExpenses
+                .Where(t => !string.IsNullOrEmpty(t.Category))
+                .Select(t => t.Category)
+                .Distinct()
+                .ToList();
+
+            foreach (var category in trackedCategories)
+            {
+                var trackedTransactions = trackedOnlyExpenses
+                    .Where(t => t.Category == category)
+                    .ToList();
+
+                _transactionUserInteraction.OutputTransactions(trackedTransactions, $"{category} (Tracked)", null);
+            }
+
+            var totalTrackedOnly = trackedOnlyExpenses.Sum(t => t.Amount);
+            Console.WriteLine($"\nTotal Fixed Obligations: ${Math.Abs(totalTrackedOnly):N2}\n");
         }
 
-        // Output Budget Vs Actual Spending Totals
-        _transactionUserInteraction.OutputBudgetVsActual(filteredTransactions, profile);
+        // === SECTION 3: ACCOUNT ACTIVITY (Transfers) ===
+        if (transfers.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                   ACCOUNT ACTIVITY");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            DisplayTransfers(transfers);
+        }
+
+        // === SECTION 4: INCOME ===
+        if (income.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                        INCOME");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            _transactionUserInteraction.OutputTransactions(income, "Income", null);
+            Console.WriteLine($"\nTotal Income: ${Math.Abs(income.Sum(t => t.Amount)):N2}\n");
+        }
+
+        // === SECTION 5: ADJUSTMENTS ===
+        if (adjustments.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                      ADJUSTMENTS");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            _transactionUserInteraction.OutputTransactions(adjustments, "Adjustments (Fees, Rewards, etc.)", null);
+            Console.WriteLine($"\nTotal Adjustments: ${adjustments.Sum(t => t.Amount):N2}\n");
+        }
+
+        // === UNCATEGORIZED TRANSACTIONS ===
+        var uncategorizedExpenses = filteredTransactions
+            .Where(t => t.Type == TransactionType.Expense && string.IsNullOrEmpty(t.Category))
+            .ToList();
+
+        if (uncategorizedExpenses.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                   UNCATEGORIZED EXPENSES");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            _transactionUserInteraction.OutputTransactions(uncategorizedExpenses, "Uncategorized", null);
+        }
 
 
         /* TODO:
-        - [ ] Fix transfers
-        - [ ] Fix Create table for other transactions
         - [ ] create method to find specific trnansactions via name and amount to categorize as, rent, student loan, etc -- take one
         - [ ] create total expense vs diff
         - [ ] aim to get caluclates to become exact
@@ -425,6 +495,124 @@ class PersonalFinancesApp
 
         */
         //_transactionCsvRepository.ExportTransactions(filteredTransactions, "./export-test.csv");
+    }
 
+    /// <summary>
+    /// Get expenses that are budgeted (not tracked-only)
+    /// </summary>
+    private List<Transaction> GetBudgetedExpenses(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => t.Type == TransactionType.Expense && !IsCategoryTrackedOnly(t.Category))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get expenses that are tracked-only (not budgeted)
+    /// </summary>
+    private List<Transaction> GetTrackedOnlyExpenses(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => t.Type == TransactionType.Expense && IsCategoryTrackedOnly(t.Category))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get all transfers
+    /// </summary>
+    private List<Transaction> GetTransfers(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => t.Type == TransactionType.Transfer)
+            .OrderBy(t => t.Date)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get all income transactions
+    /// </summary>
+    private List<Transaction> GetIncome(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => t.Type == TransactionType.Income)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get all adjustments (fees, rewards, etc.)
+    /// </summary>
+    private List<Transaction> GetAdjustments(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => t.Type == TransactionType.Adjustment)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Check if a category is marked as tracked-only
+    /// </summary>
+    private bool IsCategoryTrackedOnly(string? categoryName)
+    {
+        if (string.IsNullOrEmpty(categoryName))
+            return false;
+
+        // Check in database via repository
+        var categoriesRepo = _categoriesService as CategoriesService;
+        if (categoriesRepo != null)
+        {
+            // Note: This would require adding a synchronous method to check IsTrackedOnly
+            // For now, we'll assume categories with specific names are tracked-only
+            // This can be enhanced later with proper database lookup
+            return false; // Will be properly implemented when we have sync access to Category.IsTrackedOnly
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Display transfers with special formatting showing matched pairs
+    /// </summary>
+    private void DisplayTransfers(List<Transaction> transfers)
+    {
+        var displayedIds = new HashSet<int>();
+
+        foreach (var transfer in transfers)
+        {
+            if (displayedIds.Contains(transfer.Id))
+                continue;
+
+            // Check if this is part of a reconciled pair
+            if (transfer.IsReconciledTransfer && !string.IsNullOrEmpty(transfer.LinkedTransactionId))
+            {
+                // Find the matching transfer
+                var linkedTransfer = transfers.FirstOrDefault(t =>
+                    t.LinkedTransactionId == transfer.LinkedTransactionId &&
+                    t.Id != transfer.Id);
+
+                if (linkedTransfer != null)
+                {
+                    // Display as a matched pair
+                    var outTransfer = transfer.Amount < 0 ? transfer : linkedTransfer;
+                    var inTransfer = transfer.Amount > 0 ? transfer : linkedTransfer;
+
+                    Console.WriteLine($"{outTransfer.Date:MMM dd}  {outTransfer.AccountType,-15} {outTransfer.Description,-40} ${Math.Abs(outTransfer.Amount),10:N2} OUT ↔");
+                    Console.WriteLine($"{inTransfer.Date:MMM dd}  {inTransfer.AccountType,-15} {inTransfer.Description,-40} ${Math.Abs(inTransfer.Amount),10:N2} IN   ✓ Reconciled\n");
+
+                    displayedIds.Add(transfer.Id);
+                    displayedIds.Add(linkedTransfer.Id);
+                    continue;
+                }
+            }
+
+            // Display as unmatched transfer
+            var direction = transfer.Amount < 0 ? "OUT" : "IN ";
+            Console.WriteLine($"{transfer.Date:MMM dd}  {transfer.AccountType,-15} {transfer.Description,-40} ${Math.Abs(transfer.Amount),10:N2} {direction}  ⚠ Unmatched");
+
+            displayedIds.Add(transfer.Id);
+        }
+
+        var totalTransfers = transfers.Sum(t => t.Amount);
+        Console.WriteLine($"\nNet Transfer Activity: ${totalTransfers:N2}");
+        Console.WriteLine($"(Negative = money out, Positive = money in)\n");
     }
 }
