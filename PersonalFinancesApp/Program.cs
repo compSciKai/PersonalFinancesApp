@@ -43,6 +43,13 @@ var categoriesService = new CategoriesService(
     TransactionsConsoleUserInteraction,
     typeDetector);
 
+var transferManagementService = new TransferManagementService(
+    TransactionsConsoleUserInteraction,
+    new SqlServerTransactionRepository<RBCTransaction>(entities),
+    new SqlServerTransactionRepository<AmexTransaction>(entities),
+    new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
+    categoriesService);
+
 // Check for migration commands
 if (args.Length > 0 && args[0] == "migrate-mappings")
 {
@@ -64,7 +71,8 @@ var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     TransactionsConsoleUserInteraction,
     vendorsService,
     categoriesService,
-    budgetService
+    budgetService,
+    transferManagementService
 );
 
 await FinancesApp.RunAsync(transactionsDictionary, transactionRange);
