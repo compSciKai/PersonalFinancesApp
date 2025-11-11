@@ -26,14 +26,14 @@ public class VendorsService : IVendorsService
         {
             if (taransactionData.ToLower().Contains(kvp.Key.ToLower()))
             {
-                return kvp.Value.ToLower();
+                return kvp.Value;
             }
         }
 
         return "";
     }
 
-    public async Task StoreNewVendorAsync(string key, string vendorName)
+    public async Task StoreNewVendorAsync(string key, string vendorName, TransactionType? suggestedType = null, bool overrideType = false)
     {
         VendorsMap.Add(key, vendorName);
 
@@ -44,7 +44,9 @@ public class VendorsService : IVendorsService
             var vendorMapping = new VendorMapping
             {
                 Pattern = key,
-                VendorName = vendorName
+                VendorName = vendorName,
+                SuggestedType = suggestedType,
+                OverrideType = overrideType
             };
             await dbRepo.SaveVendorMappingAsync(vendorMapping);
         }
@@ -77,7 +79,7 @@ public class VendorsService : IVendorsService
 
                 if (vendorName == "" && !skipAll)
                 {
-                    var (vendorKVP, skipAllFlag) = _transactionUserInteraction.PromptForVendorKVP(transaction.Description);
+                    var (vendorKVP, skipAllFlag) = _transactionUserInteraction.PromptForVendorKVP(transaction);
 
                     if (skipAllFlag)
                     {
@@ -90,6 +92,7 @@ public class VendorsService : IVendorsService
                         continue;
                     }
 
+                    // Save vendor without transaction type (type will be determined at category stage)
                     await StoreNewVendorAsync(vendorKVP?.Key, vendorKVP?.Value);
                     vendorName = vendorKVP?.Value;
                 }

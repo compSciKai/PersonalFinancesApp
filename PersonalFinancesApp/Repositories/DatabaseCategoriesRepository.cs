@@ -39,7 +39,7 @@ public class DatabaseCategoriesRepository : ICategoriesRepository
     public async Task<Category> GetOrCreateCategoryAsync(string categoryName)
     {
         var existing = await _context.Categories
-            .FirstOrDefaultAsync(c => c.CategoryName == categoryName);
+            .FirstOrDefaultAsync(c => c.CategoryName.ToLower() == categoryName.ToLower());
 
         if (existing != null)
         {
@@ -48,7 +48,7 @@ public class DatabaseCategoriesRepository : ICategoriesRepository
 
         var newCategory = new Category
         {
-            CategoryName = categoryName,
+            CategoryName = ToTitleCase(categoryName),
             CreatedDate = DateTime.UtcNow
         };
 
@@ -58,18 +58,28 @@ public class DatabaseCategoriesRepository : ICategoriesRepository
         return newCategory;
     }
 
-    public async Task SaveCategoryMappingAsync(string vendorName, string categoryName)
+    public async Task SaveCategoryMappingAsync(string vendorName, string categoryName, TransactionType? suggestedType = null, bool overrideType = false, bool isTrackedOnly = false)
     {
         // Get or create the category
         var category = await GetOrCreateCategoryAsync(categoryName);
 
-        // Find the vendor mapping and update its category
+        // Update category's IsTrackedOnly flag
+        if (category.IsTrackedOnly != isTrackedOnly)
+        {
+            category.IsTrackedOnly = isTrackedOnly;
+            category.UpdatedDate = DateTime.UtcNow;
+            _context.Categories.Update(category);
+        }
+
+        // Find the vendor mapping and update its category and transaction type
         var vendorMapping = await _context.VendorMappings
-            .FirstOrDefaultAsync(v => v.VendorName == vendorName);
+            .FirstOrDefaultAsync(v => v.VendorName.ToLower() == vendorName.ToLower());
 
         if (vendorMapping != null)
         {
             vendorMapping.CategoryId = category.Id;
+            vendorMapping.SuggestedType = suggestedType;
+            vendorMapping.OverrideType = overrideType;
             vendorMapping.UpdatedDate = DateTime.UtcNow;
             _context.VendorMappings.Update(vendorMapping);
             await _context.SaveChangesAsync();
@@ -147,13 +157,19 @@ public class DatabaseCategoriesRepository : ICategoriesRepository
         return await _context.VendorMappings
             .Include(v => v.Category)
             .AsNoTracking()
-            .FirstOrDefaultAsync(v => v.VendorName == vendorName);
+            .FirstOrDefaultAsync(v => v.VendorName.ToLower() == vendorName.ToLower());
     }
 
     public async Task<Category?> GetCategoryByNameAsync(string categoryName)
     {
         return await _context.Categories
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.CategoryName == categoryName);
+            .FirstOrDefaultAsync(c => c.CategoryName.ToLower() == categoryName.ToLower());
+    }
+
+    private string ToTitleCase(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return input;
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
     }
 }

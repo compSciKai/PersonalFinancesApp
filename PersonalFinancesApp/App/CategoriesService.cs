@@ -29,7 +29,7 @@ public class CategoriesService : ICategoriesService
         {
             if (vendor != null && vendor.ToLower().Contains(kvp.Key.ToLower()))
             {
-                return kvp.Value.ToLower();
+                return kvp.Value;
             }
         }
 
@@ -41,7 +41,7 @@ public class CategoriesService : ICategoriesService
         return CategoriesMap.Values.Distinct().ToList();
     }
 
-    public async Task StoreNewCategoryAsync(string vendorName, string categoryName)
+    public async Task StoreNewCategoryAsync(string vendorName, string categoryName, TransactionType? suggestedType = null, bool overrideType = false, bool isTrackedOnly = false)
     {
         // Add to in-memory map using vendorName as key
         if (!CategoriesMap.ContainsKey(vendorName))
@@ -57,7 +57,7 @@ public class CategoriesService : ICategoriesService
         var dbRepo = _categoriesRepository as DatabaseCategoriesRepository;
         if (dbRepo != null)
         {
-            await dbRepo.SaveCategoryMappingAsync(vendorName, categoryName);
+            await dbRepo.SaveCategoryMappingAsync(vendorName, categoryName, suggestedType, overrideType, isTrackedOnly);
         }
         else
         {
@@ -82,17 +82,46 @@ public class CategoriesService : ICategoriesService
 
         foreach (var transaction in transactions)
         {
-            if (transaction.Category is null)
+            // Only process Expense transactions or transactions without a category
+            if ((transaction?.Type == TransactionType.Expense || transaction?.Type == 0) && transaction?.Category is null)
             {
-                string? categoryName = GetCategory(transaction.Vendor);
+                string? categoryName = GetCategory(transaction?.Vendor);
 
                 if (categoryName == "" && !skipAll)
                 {
-                    var (categoryKVP, skipAllFlag, addToBudget) = _transactionUserInteraction.PromptForCategoryKVP(transaction.Vendor, profile);
+                    var (categoryKVP, skipAllFlag, addToBudget, transactionType, applyTypeToAll) = _transactionUserInteraction.PromptForCategoryKVP(transaction, profile);
 
                     if (skipAllFlag)
                     {
                         skipAll = true;
+                        continue;
+                    }
+
+                    // If user selected a transaction type shortcut (i/t/a)
+                    if (transactionType.HasValue)
+                    {
+                        // Set the transaction type
+                        transaction.Type = transactionType.Value;
+
+                        // Save vendor with type hint if user chose to apply to all
+                        if (applyTypeToAll && transaction.Vendor != null)
+                        {
+                            var dbRepo = _categoriesRepository as DatabaseCategoriesRepository;
+                            if (dbRepo != null)
+                            {
+                                // Get or create vendor mapping
+                                var vendorMapping = await dbRepo.GetVendorMappingAsync(transaction.Vendor);
+                                if (vendorMapping != null)
+                                {
+                                    vendorMapping.SuggestedType = transactionType.Value;
+                                    vendorMapping.OverrideType = applyTypeToAll;
+                                    vendorMapping.UpdatedDate = DateTime.UtcNow;
+                                    // Note: Would need to save vendorMapping here - may need new repository method
+                                }
+                            }
+                        }
+
+                        // Skip category assignment and continue to next transaction
                         continue;
                     }
 
@@ -101,12 +130,19 @@ public class CategoriesService : ICategoriesService
                         continue;
                     }
 
+                    // User entered a category - treat as Expense
+                    transaction.Type = TransactionType.Expense;
+
+                    // Prompt for IsTrackedOnly
+                    bool isTrackedOnly = _transactionUserInteraction.PromptForIsTrackedOnly(categoryKVP?.Value);
+
                     // Use the actual vendor name (not the pattern from categoryKVP.Key) to link the category
-                    await StoreNewCategoryAsync(transaction.Vendor!, categoryKVP?.Value);
+                    // Since user entered a category, we don't pass transactionType (defaults to Expense via auto-detection)
+                    await StoreNewCategoryAsync(transaction.Vendor!, categoryKVP?.Value, null, false, isTrackedOnly);
                     categoryName = categoryKVP?.Value;
 
-                    // Handle adding to budget if requested
-                    if (addToBudget && profile != null && budgetService != null)
+                    // Handle adding to budget if requested (skip if tracked only)
+                    if (addToBudget && profile != null && budgetService != null && !isTrackedOnly)
                     {
                         // Calculate remaining budget
                         double allocatedBudget = profile.BudgetCategories.Values.Sum();
@@ -115,13 +151,21 @@ public class CategoriesService : ICategoriesService
                         // Prompt for budget amount
                         double budgetAmount = _transactionUserInteraction.PromptForBudgetAmount(categoryName, remainingBudget);
 
-                        // Add to profile
-                        profile.BudgetCategories[categoryName] = budgetAmount;
+                        // Format category name to Title Case (capitalize first letter of each word)
+                        string formattedCategoryName = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(categoryName.ToLower());
+
+                        // Add to profile's Categories collection directly (so EF tracks it)
+                        profile.Categories.Add(new BudgetCategory
+                        {
+                            CategoryName = formattedCategoryName,
+                            BudgetAmount = budgetAmount,
+                            BudgetProfile = profile
+                        });
 
                         // Save profile
                         await budgetService.StoreProfileAsync(profile);
 
-                        _transactionUserInteraction.ShowMessage($"\nAdded '{categoryName}' to budget with amount ${budgetAmount:0.00}");
+                        _transactionUserInteraction.ShowMessage($"\nAdded '{formattedCategoryName}' to budget with amount ${budgetAmount:0.00}");
                     }
                 }
 
@@ -159,7 +203,7 @@ public class CategoriesService : ICategoriesService
                 string? categoryName = transaction.Category;
                 if (!string.IsNullOrEmpty(categoryName) && categoryName.ToLower() == categoryToOverride.ToLower())
                 {
-                    transaction.Category = newCategory.ToLower();
+                    transaction.Category = newCategory;
                 }
             }
         }

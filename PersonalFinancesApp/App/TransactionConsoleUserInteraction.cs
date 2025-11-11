@@ -216,14 +216,15 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         return transactionsTable;
     }
 
-    public (KeyValuePair<string, string>? kvp, bool skipAll) PromptForVendorKVP(string description)
+    public (KeyValuePair<string, string>? kvp, bool skipAll) PromptForVendorKVP(Transaction transaction)
     {
         bool invalidVendorInput = true;
         string vendorKey = "";
         string vendorValue = "";
+        string description = transaction.Description ?? "";
 
-        ShowMessage(
-        $"Vendor could not be found for this transaction with description: '{description}'.");
+        ShowMessage($"Vendor could not be found for this transaction.");
+        DisplayTransactionDetails(transaction);
 
         while (invalidVendorInput)
         {
@@ -244,7 +245,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             // If user presses Enter, use the full description
             if (string.IsNullOrEmpty(vendorKey))
             {
-                return (new KeyValuePair<string, string>(description.ToLower(), description.ToLower()), false);
+                return (new KeyValuePair<string, string>(description.ToLower(), description), false);
             }
 
             if (description.ToLower().Contains(vendorKey.ToLower()))
@@ -265,17 +266,21 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             }
         }
 
-        return (new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue.ToLower()), false);
+        return (new KeyValuePair<string, string>(vendorKey.ToLower(), vendorValue), false);
     }
 
-    public (KeyValuePair<string, string>? kvp, bool skipAll, bool addToBudget) PromptForCategoryKVP(string vendor, BudgetProfile? profile)
+    public (KeyValuePair<string, string>? kvp, bool skipAll, bool addToBudget, TransactionType? transactionType, bool applyTypeToAll) PromptForCategoryKVP(Transaction transaction, BudgetProfile? profile)
     {
         bool invalidCategoryInput = true;
         string categoryKey = "";
         string categoryValue = "";
         bool addToBudget = false;
+        TransactionType? transactionType = null;
+        bool applyTypeToAll = false;
+        string vendor = transaction.Vendor ?? "";
 
         ShowMessage($"\nCategory could not be found for this vendor: '{vendor}'.");
+        DisplayTransactionDetails(transaction);
 
         // Show autocomplete suggestions (Phase 3)
         if (profile != null && profile.BudgetCategories.Any())
@@ -292,18 +297,46 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
 
         while (invalidCategoryInput)
         {
-            ShowMessage($"Enter a string from the vendor that will identify the category for this vendor,");
-            ShowMessage($"or press Enter to use '{vendor}', or type 's' to skip, or 'sa' to skip all");
-            categoryKey = GetInput();
+            ShowMessage($"Shortcuts: (i)ncome, (t)ransfer, (a)djustment, (s)kip, (sa)skip all");
+            ShowMessage($"Enter category or shortcut, or press Enter to use '{vendor}': ");
+            categoryKey = GetInput().Trim().ToLower();
+
+            // Handle transaction type shortcuts
+            if (categoryKey == "i")
+            {
+                transactionType = TransactionType.Income;
+                ShowMessage($"\nApply 'Income' type to all future transactions from '{vendor}'? (y/n): ");
+                string applyResponse = GetInput().Trim().ToLower();
+                applyTypeToAll = applyResponse == "y" || applyResponse == "yes" || applyResponse == "";
+                return (null, false, false, transactionType, applyTypeToAll);
+            }
+
+            if (categoryKey == "t")
+            {
+                transactionType = TransactionType.Transfer;
+                ShowMessage($"\nApply 'Transfer' type to all future transactions from '{vendor}'? (y/n): ");
+                string applyResponse = GetInput().Trim().ToLower();
+                applyTypeToAll = applyResponse == "y" || applyResponse == "yes" || applyResponse == "";
+                return (null, false, false, transactionType, applyTypeToAll);
+            }
+
+            if (categoryKey == "a")
+            {
+                transactionType = TransactionType.Adjustment;
+                ShowMessage($"\nApply 'Adjustment' type to all future transactions from '{vendor}'? (y/n): ");
+                string applyResponse = GetInput().Trim().ToLower();
+                applyTypeToAll = applyResponse == "y" || applyResponse == "yes" || applyResponse == "";
+                return (null, false, false, transactionType, applyTypeToAll);
+            }
 
             if (categoryKey == "s")
             {
-                return (null, false, false);
+                return (null, false, false, null, false);
             }
 
             if (categoryKey == "sa")
             {
-                return (null, true, false);
+                return (null, true, false, null, false);
             }
 
             // If user presses Enter, use the full vendor name as the pattern
@@ -325,13 +358,20 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                 // Phase 2: Validate against budget profile
                 if (profile != null)
                 {
-                    // Check for case-insensitive match
+                    // Check for exact case-insensitive match
                     var matchingCategory = profile.BudgetCategories.Keys
                         .FirstOrDefault(c => c.Equals(categoryValue, StringComparison.OrdinalIgnoreCase));
 
+                    // If no exact match, check for singular/plural equivalents
+                    if (matchingCategory == null)
+                    {
+                        matchingCategory = profile.BudgetCategories.Keys
+                            .FirstOrDefault(c => AreSingularPluralEquivalent(c, categoryValue));
+                    }
+
                     if (matchingCategory != null && !matchingCategory.Equals(categoryValue))
                     {
-                        // Found a case-insensitive match - suggest it
+                        // Found a match (case-insensitive or singular/plural) - suggest it
                         ShowMessage($"\nDid you mean '{matchingCategory}'? (y/n)");
                         string response = GetInput().Trim().ToLower();
 
@@ -352,17 +392,17 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                         ShowMessage($"\nWould you like to add '{categoryValue}' to your budget? (y/n/s/sa)");
                         string addResponse = GetInput().Trim().ToLower();
 
-                        if (addResponse == "y" || addResponse == "yes")
+                        if (addResponse == "y" || addResponse == "yes" || addResponse == "")
                         {
                             addToBudget = true;
                         }
                         else if (addResponse == "s")
                         {
-                            return (null, false, false);
+                            return (null, false, false, null, false);
                         }
                         else if (addResponse == "sa")
                         {
-                            return (null, true, false);
+                            return (null, true, false, null, false);
                         }
                     }
                 }
@@ -375,7 +415,8 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             }
         }
 
-        return (new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue.ToLower()), false, addToBudget);
+        // When user enters a category, default to Expense type (will be set in CategoriesService)
+        return (new KeyValuePair<string, string>(categoryKey.ToLower(), categoryValue), false, addToBudget, null, false);
     }
     public void OutputBudgetVsActual(List<Transaction> transactions, BudgetProfile? profile)
     {
@@ -457,5 +498,70 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                 ShowMessage("Invalid input. Please enter a valid number.");
             }
         }
+    }
+
+    public (TransactionType type, bool applyToAll) PromptForTransactionType(string context)
+    {
+        ShowMessage($"\nTransaction type for {context}?");
+        ShowMessage("  1 = Expense (default)");
+        ShowMessage("  2 = Income");
+        ShowMessage("  3 = Transfer");
+        ShowMessage("  4 = Adjustment");
+        ShowMessage("  Enter = Auto-detect");
+        ShowMessage("Choice: ");
+
+        string input = GetInput().Trim();
+
+        TransactionType selectedType = input switch
+        {
+            "1" => TransactionType.Expense,
+            "2" => TransactionType.Income,
+            "3" => TransactionType.Transfer,
+            "4" => TransactionType.Adjustment,
+            _ => TransactionType.Expense // Auto-detect will use rules, this is just a placeholder
+        };
+
+        // If user selected a specific type (not auto), ask if they want to apply to all
+        bool applyToAll = false;
+        if (!string.IsNullOrEmpty(input))
+        {
+            ShowMessage($"\nApply '{selectedType}' type to all future transactions from this vendor/category? (y/n): ");
+            string applyResponse = GetInput().Trim().ToLower();
+            applyToAll = applyResponse == "y" || applyResponse == "yes";
+        }
+
+        return (selectedType, applyToAll);
+    }
+
+    public bool PromptForIsTrackedOnly(string categoryName)
+    {
+        ShowMessage($"\nPress Enter to track and budget '{categoryName}', or 'x' to track only (mortgage, etc.): ");
+        string input = GetInput().Trim().ToLower();
+        return input == "x"; // Returns true (IsTrackedOnly) if user types 'x'
+    }
+
+    private void DisplayTransactionDetails(Transaction transaction)
+    {
+        ShowMessage("\nTransaction Details:");
+        ShowMessage($"  Account Type: {transaction.AccountType ?? "N/A"}");
+        ShowMessage($"  Date: {transaction.Date:yyyy-MM-dd}");
+        ShowMessage($"  Amount: {transaction.Amount:C}");
+        ShowMessage($"  Description: {transaction.Description ?? "N/A"}");
+        ShowMessage("");
+    }
+
+    private static bool AreSingularPluralEquivalent(string word1, string word2)
+    {
+        if (string.IsNullOrWhiteSpace(word1) || string.IsNullOrWhiteSpace(word2))
+            return false;
+
+        word1 = word1.Trim().ToLower();
+        word2 = word2.Trim().ToLower();
+
+        // Check if they're already equal
+        if (word1 == word2) return true;
+
+        // Check if one is the plural of the other (simple 's' addition)
+        return (word1 + "s" == word2) || (word2 + "s" == word1);
     }
 }

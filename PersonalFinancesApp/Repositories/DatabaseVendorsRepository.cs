@@ -29,17 +29,18 @@ public class DatabaseVendorsRepository : IVendorsRepository
     public async Task SaveVendorMappingAsync(VendorMapping vendorMapping)
     {
         var existing = await _context.VendorMappings
-            .FirstOrDefaultAsync(v => v.Pattern == vendorMapping.Pattern);
+            .FirstOrDefaultAsync(v => v.Pattern.ToLower() == vendorMapping.Pattern.ToLower());
 
         if (existing != null)
         {
-            existing.VendorName = vendorMapping.VendorName;
+            existing.VendorName = ToTitleCase(vendorMapping.VendorName);
             existing.CategoryId = vendorMapping.CategoryId;
             existing.UpdatedDate = DateTime.UtcNow;
             _context.VendorMappings.Update(existing);
         }
         else
         {
+            vendorMapping.VendorName = ToTitleCase(vendorMapping.VendorName);
             vendorMapping.CreatedDate = DateTime.UtcNow;
             await _context.VendorMappings.AddAsync(vendorMapping);
         }
@@ -51,10 +52,17 @@ public class DatabaseVendorsRepository : IVendorsRepository
     {
         foreach (var vendorMapping in vendorMappings)
         {
+            vendorMapping.VendorName = ToTitleCase(vendorMapping.VendorName);
             vendorMapping.CreatedDate = DateTime.UtcNow;
         }
 
         await _context.VendorMappings.AddRangeAsync(vendorMappings);
         await _context.SaveChangesAsync();
+    }
+
+    private string ToTitleCase(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return input;
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
     }
 }

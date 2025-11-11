@@ -322,27 +322,32 @@ class PersonalFinancesApp
         var rbcTransactions = await _rbcSqlRepository.GetAllAsync();
         var amexTransactions = await _amexSqlRepository.GetAllAsync();
         var pcTransactions = await _pcSqlRepository.GetAllAsync();
-        
+
         var allTransactions = new List<Transaction>();
         allTransactions.AddRange(rbcTransactions);
         allTransactions.AddRange(amexTransactions);
         allTransactions.AddRange(pcTransactions);
 
-        // process transactions if missing fields
+        // Filter by date range BEFORE prompting user for vendor/category
+        List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(allTransactions, transactionFilterString);
 
-        // construct list of transactions and handler dictionary, iterate over
-        List<Transaction> transactionsWithVendors = await _vendorsService.AddVendorsToTransactionsAsync(allTransactions);
-        List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors, profile, _budgetService);
-        List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
-
+        // Filter by user BEFORE prompting (if applicable)
         if (profile.UserName != null)
         {
             filteredTransactions = TransactionFilterService.GetTransactionsForUser(filteredTransactions, profile.UserName);
         }
 
+        // Now process only the filtered transactions - user only sees prompts for relevant date range
+        List<Transaction> transactionsWithVendors = await _vendorsService.AddVendorsToTransactionsAsync(filteredTransactions);
+        List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors, profile, _budgetService);
+
+        // Update filteredTransactions to point to the categorized subset
+        filteredTransactions = transactionsWithCategories;
+
         filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
 
-        List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
+        //List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
+        List<Transaction> spendingTransactions = filteredTransactions;
 
         string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
         string tableName = rangeType is not null ? $"{rangeType} Transactions" : "Transactions";

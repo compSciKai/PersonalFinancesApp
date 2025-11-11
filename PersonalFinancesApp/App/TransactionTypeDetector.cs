@@ -14,7 +14,7 @@ public class TransactionTypeDetector
         "tfsa", "rrsp", "loan payment", "mortgage", "credit payment"
     };
 
-    private readonly string[] _nonBudgetedKeywords = new[]
+    private readonly string[] _adjustmentKeywords = new[]
     {
         "fee", "interest charge", "overdraft",
         "cashback", "reward", "refund", "reversal"
@@ -79,11 +79,11 @@ public class TransactionTypeDetector
             return TransactionType.Income;
         }
 
-        // Check for non-budgeted keywords
-        if (ContainsAnyKeyword(lowerDescription, _nonBudgetedKeywords) ||
-            ContainsAnyKeyword(lowerVendor, _nonBudgetedKeywords))
+        // Check for adjustment keywords
+        if (ContainsAnyKeyword(lowerDescription, _adjustmentKeywords) ||
+            ContainsAnyKeyword(lowerVendor, _adjustmentKeywords))
         {
-            return TransactionType.NonBudgeted;
+            return TransactionType.Adjustment;
         }
 
         // PRIORITY 5: Use vendor suggestion if we haven't matched anything else
@@ -141,8 +141,8 @@ public class TransactionTypeDetector
                                        ContainsAnyKeyword(lowerVendor, _transferKeywords),
             TransactionType.Income => ContainsAnyKeyword(lowerDescription, _incomeKeywords) ||
                                      ContainsAnyKeyword(lowerVendor, _incomeKeywords),
-            TransactionType.NonBudgeted => ContainsAnyKeyword(lowerDescription, _nonBudgetedKeywords) ||
-                                          ContainsAnyKeyword(lowerVendor, _nonBudgetedKeywords),
+            TransactionType.Adjustment => ContainsAnyKeyword(lowerDescription, _adjustmentKeywords) ||
+                                          ContainsAnyKeyword(lowerVendor, _adjustmentKeywords),
             _ => false
         };
 

@@ -30,5 +30,5 @@ public enum TransactionType
     /// Tracked for visibility but typically not budgeted.
     /// Does not count against budget by default.
     /// </summary>
-    NonBudgeted = 4
+    Adjustment = 4
 }
