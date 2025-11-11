@@ -76,6 +76,11 @@ public class CsvTransactionRepository<T> : IFileTransactionRepository<T> where T
         throw new NotSupportedException("CSV repository requires a file path. Use SaveToFileAsync instead.");
     }
 
+    public async Task<int> UpdateAsync(List<T> transactions)
+    {
+        throw new NotSupportedException("CSV repository does not support updating transactions. Use SaveToFileAsync to overwrite the entire file.");
+    }
+
     public async Task<bool> ExistsAsync(string transactionHash)
     {
         throw new NotSupportedException("CSV repository cannot check existence without loading a file first.");

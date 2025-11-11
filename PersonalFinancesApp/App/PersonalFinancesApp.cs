@@ -341,6 +341,18 @@ class PersonalFinancesApp
         List<Transaction> transactionsWithVendors = await _vendorsService.AddVendorsToTransactionsAsync(filteredTransactions);
         List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors, profile, _budgetService);
 
+        // Persist Transaction.Type and other changes to database
+        var rbcToUpdate = transactionsWithCategories.OfType<RBCTransaction>().ToList();
+        var amexToUpdate = transactionsWithCategories.OfType<AmexTransaction>().ToList();
+        var pcToUpdate = transactionsWithCategories.OfType<PCFinancialTransaction>().ToList();
+
+        if (rbcToUpdate.Any())
+            await _rbcSqlRepository.UpdateAsync(rbcToUpdate);
+        if (amexToUpdate.Any())
+            await _amexSqlRepository.UpdateAsync(amexToUpdate);
+        if (pcToUpdate.Any())
+            await _pcSqlRepository.UpdateAsync(pcToUpdate);
+
         // Update filteredTransactions to point to the categorized subset
         filteredTransactions = transactionsWithCategories;
 
