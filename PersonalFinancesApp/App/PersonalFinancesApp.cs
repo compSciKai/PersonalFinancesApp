@@ -16,6 +16,7 @@ class PersonalFinancesApp
     private readonly IVendorsService _vendorsService;
     private readonly ICategoriesService _categoriesService;
     private readonly IBudgetService _budgetService;
+    private readonly ITransferManagementService _transferManagementService;
 
     public PersonalFinancesApp(
         IFileTransactionRepository<RBCTransaction> rbcCsvRepository,
@@ -27,7 +28,8 @@ class PersonalFinancesApp
         ITransactionsUserInteraction transactionUserInteraction,
         IVendorsService vendorsService,
         ICategoriesService categoriesService,
-        IBudgetService budgetService
+        IBudgetService budgetService,
+        ITransferManagementService transferManagementService
         )
     {
         _rbcCsvRepository = rbcCsvRepository;
@@ -40,6 +42,7 @@ class PersonalFinancesApp
         _vendorsService = vendorsService;
         _categoriesService = categoriesService;
         _budgetService = budgetService;
+        _transferManagementService = transferManagementService;
     }
 
     private async Task<string?> LoadLastUsedProfileAsync()
@@ -355,6 +358,26 @@ class PersonalFinancesApp
 
         // Update filteredTransactions to point to the categorized subset
         filteredTransactions = transactionsWithCategories;
+
+        // Transfer Management Phase
+        var transferCount = filteredTransactions.Count(t => t.Type == TransactionType.Transfer);
+        if (transferCount > 0)
+        {
+            Console.Write($"\nFound {transferCount} transfer(s). Review transfers? (y/n): ");
+            var reviewTransfers = Console.ReadLine()?.Trim().ToLower();
+
+            if (reviewTransfers == "y")
+            {
+                try
+                {
+                    await _transferManagementService.ManageTransfersAsync(filteredTransactions, profile);
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("Transfer management cancelled.\n");
+                }
+            }
+        }
 
         filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
 
