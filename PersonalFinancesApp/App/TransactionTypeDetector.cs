@@ -52,13 +52,7 @@ public class TransactionTypeDetector
             // This could be enhanced with confidence scoring
         }
 
-        // PRIORITY 3: Amount-based detection (negative = income in most bank CSVs)
-        if (transaction.Amount < 0)
-        {
-            return TransactionType.Income;
-        }
-
-        // PRIORITY 4: Keyword-based detection
+        // PRIORITY 3: Keyword-based detection (most specific, takes precedence)
         var lowerDescription = transaction.Description?.ToLower() ?? string.Empty;
         var lowerVendor = transaction.Vendor?.ToLower() ?? string.Empty;
         var lowerCategory = transaction.Category?.ToLower() ?? string.Empty;
@@ -71,7 +65,7 @@ public class TransactionTypeDetector
             return TransactionType.Transfer;
         }
 
-        // Check for income keywords (in case amount is positive but it's still income)
+        // Check for income keywords
         if (ContainsAnyKeyword(lowerDescription, _incomeKeywords) ||
             ContainsAnyKeyword(lowerVendor, _incomeKeywords) ||
             ContainsAnyKeyword(lowerCategory, _incomeKeywords))
@@ -84,6 +78,18 @@ public class TransactionTypeDetector
             ContainsAnyKeyword(lowerVendor, _adjustmentKeywords))
         {
             return TransactionType.Adjustment;
+        }
+
+        // PRIORITY 4: Amount-based detection (respects bank-specific conventions)
+        // isNegativeAmounts = true: expenses are negative, income is positive (RBC, PC Financial)
+        // isNegativeAmounts = false: expenses are positive, income is negative (Amex)
+        if (transaction.isNegativeAmounts && transaction.Amount > 0)
+        {
+            return TransactionType.Income;  // RBC/PC: positive = money in
+        }
+        else if (!transaction.isNegativeAmounts && transaction.Amount < 0)
+        {
+            return TransactionType.Income;  // Amex: negative = money in
         }
 
         // PRIORITY 5: Use vendor suggestion if we haven't matched anything else

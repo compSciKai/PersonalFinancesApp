@@ -50,6 +50,14 @@ var transferManagementService = new TransferManagementService(
     new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
     categoriesService);
 
+var reprocessingService = new TransactionReprocessingService(
+    new SqlServerTransactionRepository<RBCTransaction>(entities),
+    new SqlServerTransactionRepository<AmexTransaction>(entities),
+    new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
+    vendorsService,
+    categoriesService,
+    budgetService);
+
 // Check for migration commands
 if (args.Length > 0 && args[0] == "migrate-mappings")
 {
@@ -72,7 +80,8 @@ var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     vendorsService,
     categoriesService,
     budgetService,
-    transferManagementService
+    transferManagementService,
+    reprocessingService
 );
 
 await FinancesApp.RunAsync(transactionsDictionary, transactionRange);

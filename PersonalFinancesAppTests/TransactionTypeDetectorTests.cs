@@ -74,11 +74,11 @@ public class TransactionTypeDetectorTests
     [Test]
     public void DetectType_WithNegativeAmount_ReturnsIncome()
     {
-        // Arrange
+        // Arrange - For RBC (isNegativeAmounts=true), positive amounts = income
         var transaction = new RBCTransaction
         {
             Description = "Paycheck",
-            Amount = -1500m, // Negative = money in
+            Amount = 1500m, // Positive = money in for RBC
             Vendor = "Employer"
         };
 
@@ -237,11 +237,11 @@ public class TransactionTypeDetectorTests
     [Test]
     public void DetectType_NoMatchingKeywords_ReturnsExpense()
     {
-        // Arrange
+        // Arrange - For RBC (isNegativeAmounts=true), negative amounts = expenses
         var transaction = new RBCTransaction
         {
             Description = "Grocery Store Purchase",
-            Amount = 50m,
+            Amount = -50m, // Negative = money out = expense for RBC
             Vendor = "Walmart"
         };
 
@@ -255,11 +255,11 @@ public class TransactionTypeDetectorTests
     [Test]
     public void DetectType_EmptyDescription_ReturnsExpense()
     {
-        // Arrange
+        // Arrange - For RBC (isNegativeAmounts=true), negative amounts = expenses
         var transaction = new RBCTransaction
         {
             Description = "",
-            Amount = 50m,
+            Amount = -50m, // Negative = money out = expense for RBC
             Vendor = "Unknown"
         };
 
@@ -302,19 +302,20 @@ public class TransactionTypeDetectorTests
     [Test]
     public void DetectType_AmountTakesPrecedenceOverKeywords()
     {
-        // Arrange - Description has "fee" (Adjustment keyword) but amount is negative
+        // Arrange - Description has "fee" (Adjustment keyword) and amount is positive (would be Income)
+        // This tests that keywords take precedence over amount-based detection
         var transaction = new RBCTransaction
         {
-            Description = "Account fee refund",
-            Amount = -25m, // Negative = money in = Income
+            Description = "Account fee",
+            Amount = 25m, // Positive = would be Income based on amount alone
             Vendor = "Bank"
         };
 
         // Act
         var result = _detector.DetectType(transaction, null, null);
 
-        // Assert - Income (from amount) should take precedence over Adjustment (from keyword)
-        Assert.That(result, Is.EqualTo(TransactionType.Income));
+        // Assert - Adjustment (from keyword) should take precedence over Income (from amount)
+        Assert.That(result, Is.EqualTo(TransactionType.Adjustment));
     }
 
     [Test]

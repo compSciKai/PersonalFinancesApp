@@ -17,6 +17,7 @@ class PersonalFinancesApp
     private readonly ICategoriesService _categoriesService;
     private readonly IBudgetService _budgetService;
     private readonly ITransferManagementService _transferManagementService;
+    private readonly ITransactionReprocessingService _reprocessingService;
 
     public PersonalFinancesApp(
         IFileTransactionRepository<RBCTransaction> rbcCsvRepository,
@@ -29,7 +30,8 @@ class PersonalFinancesApp
         IVendorsService vendorsService,
         ICategoriesService categoriesService,
         IBudgetService budgetService,
-        ITransferManagementService transferManagementService
+        ITransferManagementService transferManagementService,
+        ITransactionReprocessingService reprocessingService
         )
     {
         _rbcCsvRepository = rbcCsvRepository;
@@ -43,6 +45,7 @@ class PersonalFinancesApp
         _categoriesService = categoriesService;
         _budgetService = budgetService;
         _transferManagementService = transferManagementService;
+        _reprocessingService = reprocessingService;
     }
 
     private async Task<string?> LoadLastUsedProfileAsync()
@@ -198,12 +201,13 @@ class PersonalFinancesApp
         _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
         _transactionUserInteraction.ShowMessage("2. Edit profile");
         _transactionUserInteraction.ShowMessage("3. Category cleanup");
-        _transactionUserInteraction.ShowMessage("4. Quit\n");
+        _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+        _transactionUserInteraction.ShowMessage("5. Quit\n");
 
         string userInput = _transactionUserInteraction.GetInput().Trim();
 
         // Input validation
-        if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+        if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
         {
             _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
             userInput = "1";
@@ -235,18 +239,19 @@ class PersonalFinancesApp
                     _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
                     _transactionUserInteraction.ShowMessage("2. Edit profile");
                     _transactionUserInteraction.ShowMessage("3. Category cleanup");
-                    _transactionUserInteraction.ShowMessage("4. Quit\n");
+                    _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+                    _transactionUserInteraction.ShowMessage("5. Quit\n");
 
                     userInput = _transactionUserInteraction.GetInput().Trim();
 
                     // Input validation
-                    if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+                    if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
                     {
                         _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
                         userInput = "1";
                     }
 
-                    if (userInput != "2" && userInput != "3")
+                    if (userInput != "2" && userInput != "3" && userInput != "4")
                     {
                         continueEditing = false;
                     }
@@ -268,24 +273,73 @@ class PersonalFinancesApp
             _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
             _transactionUserInteraction.ShowMessage("2. Edit profile");
             _transactionUserInteraction.ShowMessage("3. Category cleanup");
-            _transactionUserInteraction.ShowMessage("4. Quit\n");
+            _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+            _transactionUserInteraction.ShowMessage("5. Quit\n");
 
             userInput = _transactionUserInteraction.GetInput().Trim();
 
             // Input validation
-            if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+            if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
             {
                 _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
                 userInput = "1";
             }
 
-            if (userInput == "4")
+            if (userInput == "5")
             {
                 _transactionUserInteraction.Exit();
             }
         }
 
         if (userInput == "4")
+        {
+            // Reprocess untyped transactions within the configured date range for current user
+            var transactionsToReprocess = await _reprocessingService.GetUnprocessedTransactionsAsync(transactionFilterString, profile.UserName);
+
+            if (transactionsToReprocess.Any())
+            {
+                _transactionUserInteraction.ShowMessage($"\nFound {transactionsToReprocess.Count} unprocessed transaction(s) with Type=0 in date range '{TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString)}'.");
+                _transactionUserInteraction.ShowMessage("Reprocess these transactions? (y/n): ");
+                var response = _transactionUserInteraction.GetInput().Trim().ToLower();
+
+                if (response == "y")
+                {
+                    await _reprocessingService.ReprocessTransactionsAsync(transactionsToReprocess, profile);
+                }
+                else
+                {
+                    _transactionUserInteraction.ShowMessage("Reprocessing cancelled.\n");
+                }
+            }
+            else
+            {
+                _transactionUserInteraction.ShowMessage($"\nNo unprocessed transactions found in date range '{TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString)}' (all transactions have Type assigned).\n");
+            }
+
+            // After reprocessing, show menu again
+            _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+            _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
+            _transactionUserInteraction.ShowMessage("2. Edit profile");
+            _transactionUserInteraction.ShowMessage("3. Category cleanup");
+            _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+            _transactionUserInteraction.ShowMessage("5. Quit\n");
+
+            userInput = _transactionUserInteraction.GetInput().Trim();
+
+            // Input validation
+            if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
+            {
+                _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
+                userInput = "1";
+            }
+
+            if (userInput == "5")
+            {
+                _transactionUserInteraction.Exit();
+            }
+        }
+
+        if (userInput == "5")
         {
             _transactionUserInteraction.Exit();
         }
@@ -484,6 +538,21 @@ class PersonalFinancesApp
             Console.WriteLine("═══════════════════════════════════════════════════════════\n");
 
             _transactionUserInteraction.OutputTransactions(uncategorizedExpenses, "Uncategorized", null);
+        }
+
+        // === UNPROCESSED TRANSACTIONS ===
+        var unprocessedTransactions = filteredTransactions
+            .Where(t => t.Type == 0 || t.Type == default(TransactionType))
+            .ToList();
+
+        if (unprocessedTransactions.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                ⚠ UNPROCESSED TRANSACTIONS");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            _transactionUserInteraction.OutputTransactions(unprocessedTransactions, "Unprocessed", null);
+            Console.WriteLine($"\n⚠ {unprocessedTransactions.Count} transaction(s) need type classification.\n");
         }
 
 
