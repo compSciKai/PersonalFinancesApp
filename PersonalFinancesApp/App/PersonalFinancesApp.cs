@@ -664,8 +664,11 @@ class PersonalFinancesApp
                     var outTransfer = transfer.Amount < 0 ? transfer : linkedTransfer;
                     var inTransfer = transfer.Amount > 0 ? transfer : linkedTransfer;
 
-                    Console.WriteLine($"{outTransfer.Date:MMM dd}  {outTransfer.AccountType,-15} {outTransfer.Description,-40} ${Math.Abs(outTransfer.Amount),10:N2} OUT ↔");
-                    Console.WriteLine($"{inTransfer.Date:MMM dd}  {inTransfer.AccountType,-15} {inTransfer.Description,-40} ${Math.Abs(inTransfer.Amount),10:N2} IN   ✓ Reconciled\n");
+                    var outAccount = GetFormattedAccountInfo(outTransfer);
+                    var inAccount = GetFormattedAccountInfo(inTransfer);
+
+                    Console.WriteLine($"{outTransfer.Date:MMM dd}  {outAccount,-20} {outTransfer.Description,-40} ${Math.Abs(outTransfer.Amount),10:N2} ↑ OUT ↔");
+                    Console.WriteLine($"{inTransfer.Date:MMM dd}  {inAccount,-20} {inTransfer.Description,-40} ${Math.Abs(inTransfer.Amount),10:N2} ↓ IN   ✓ Reconciled\n");
 
                     displayedIds.Add(transfer.Id);
                     displayedIds.Add(linkedTransfer.Id);
@@ -674,14 +677,32 @@ class PersonalFinancesApp
             }
 
             // Display as unmatched transfer
-            var direction = transfer.Amount < 0 ? "OUT" : "IN ";
-            Console.WriteLine($"{transfer.Date:MMM dd}  {transfer.AccountType,-15} {transfer.Description,-40} ${Math.Abs(transfer.Amount),10:N2} {direction}  ⚠ Unmatched");
+            var account = GetFormattedAccountInfo(transfer);
+            var direction = transfer.Amount < 0 ? "↑ OUT" : "↓ IN ";
+            Console.WriteLine($"{transfer.Date:MMM dd}  {account,-20} {transfer.Description,-40} ${Math.Abs(transfer.Amount),10:N2} {direction}  ⚠ Unmatched");
 
             displayedIds.Add(transfer.Id);
         }
 
         var totalTransfers = transfers.Sum(t => t.Amount);
         Console.WriteLine($"\nNet Transfer Activity: ${totalTransfers:N2}");
-        Console.WriteLine($"(Negative = money out, Positive = money in)\n");
+        Console.WriteLine($"(↑ = money out, ↓ = money in)\n");
+    }
+
+    /// <summary>
+    /// Format account information with account number (last 4 digits) if available
+    /// </summary>
+    private string GetFormattedAccountInfo(Transaction transaction)
+    {
+        if (transaction is AmexTransaction amex && !string.IsNullOrEmpty(amex.AccountNumber))
+        {
+            // Get last 4 digits of account number
+            var last4 = amex.AccountNumber.Length > 4
+                ? amex.AccountNumber.Substring(amex.AccountNumber.Length - 4)
+                : amex.AccountNumber;
+            return $"{transaction.AccountType} (*{last4})";
+        }
+
+        return transaction.AccountType;
     }
 }

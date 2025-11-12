@@ -71,7 +71,9 @@ public class TransferManagementService : ITransferManagementService
         for (int i = 0; i < eTransfers.Count; i++)
         {
             var trans = eTransfers[i];
-            Console.WriteLine($"[{i + 1}] {trans.Date:MMM dd} - {trans.Description,-50} ${trans.Amount,10:N2}");
+            var account = GetFormattedAccountInfo(trans);
+            var direction = trans.Amount < 0 ? "↑ OUT" : "↓ IN ";
+            Console.WriteLine($"[{i + 1}] {trans.Date:MMM dd}  {account,-20} {trans.Description,-40} ${Math.Abs(trans.Amount),10:N2} {direction}");
         }
 
         Console.WriteLine("\nOptions:");
@@ -180,9 +182,12 @@ public class TransferManagementService : ITransferManagementService
                     var confidence = match.Confidence;
                     var confidenceLabel = match.ConfidenceLabel;
 
+                    var account1 = GetFormattedAccountInfo(trans1);
+                    var account2 = GetFormattedAccountInfo(trans2);
+
                     Console.WriteLine($"Potential Match ({confidenceLabel} confidence):");
-                    Console.WriteLine($"  OUT: {trans1.Date:MMM dd} | {trans1.AccountType,-15} | {trans1.Description,-40} | ${Math.Abs(trans1.Amount),10:N2}");
-                    Console.WriteLine($"  IN:  {trans2.Date:MMM dd} | {trans2.AccountType,-15} | {trans2.Description,-40} | ${Math.Abs(trans2.Amount),10:N2}");
+                    Console.WriteLine($"  {trans1.Date:MMM dd}  {account1,-20} {trans1.Description,-40} ${Math.Abs(trans1.Amount),10:N2} ↑ OUT");
+                    Console.WriteLine($"  {trans2.Date:MMM dd}  {account2,-20} {trans2.Description,-40} ${Math.Abs(trans2.Amount),10:N2} ↓ IN");
                     Console.Write("\nLink these transactions? (y/n): ");
 
                     var confirm = Console.ReadLine()?.Trim().ToLower();
@@ -305,7 +310,9 @@ public class TransferManagementService : ITransferManagementService
 
         foreach (var trans in unmatchedTransfers)
         {
-            Console.WriteLine($"\n{trans.Date:MMM dd} | {trans.AccountType,-15} | {trans.Description,-40} | ${trans.Amount,10:N2}");
+            var account = GetFormattedAccountInfo(trans);
+            var direction = trans.Amount < 0 ? "↑ OUT" : "↓ IN ";
+            Console.WriteLine($"\n{trans.Date:MMM dd}  {account,-20} {trans.Description,-40} ${Math.Abs(trans.Amount),10:N2} {direction}");
             Console.WriteLine("\nOptions:");
             Console.WriteLine("  [1] Reclassify as Expense (specify category)");
             Console.WriteLine("  [2] Reclassify as Income");
@@ -357,6 +364,23 @@ public class TransferManagementService : ITransferManagementService
             await _amexRepository.UpdateAsync(amexToUpdate);
         if (pcToUpdate.Any())
             await _pcRepository.UpdateAsync(pcToUpdate);
+    }
+
+    /// <summary>
+    /// Format account information with account number (last 4 digits) if available
+    /// </summary>
+    private string GetFormattedAccountInfo(Transaction transaction)
+    {
+        if (transaction is AmexTransaction amex && !string.IsNullOrEmpty(amex.AccountNumber))
+        {
+            // Get last 4 digits of account number
+            var last4 = amex.AccountNumber.Length > 4
+                ? amex.AccountNumber.Substring(amex.AccountNumber.Length - 4)
+                : amex.AccountNumber;
+            return $"{transaction.AccountType} (*{last4})";
+        }
+
+        return transaction.AccountType;
     }
 
     /// <summary>
