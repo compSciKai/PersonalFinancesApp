@@ -3,6 +3,7 @@ using PersonalFinances.Data;
 using PersonalFinances.Models;
 using PersonalFinances.Repositories;
 using PersonalFinances.Utilities;
+using Microsoft.Extensions.Configuration;
 
 
 // Transactions Paths
@@ -17,72 +18,135 @@ using PersonalFinances.Utilities;
 
 TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.CurrentMonth;
 
+// Build configuration from appsettings.json
+var configuration = new ConfigurationBuilder()
+    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+    .Build();
+
+// Initialize database context with configuration
+TransactionContext.Initialize(configuration);
+
 var TransactionsConsoleUserInteraction = new TransactionsConsoleUserInteraction();
 var entities = new TransactionContext();
 
-// Validate database connection before proceeding
+Console.WriteLine();
+Console.WriteLine();
+Console.WriteLine("  /$$$$$$                      /$$       /$$$$$$$$ /$$                        ");
+Console.WriteLine(" /$$__  $$                    | $$      | $$_____/| $$                        ");
+Console.WriteLine("| $$  \\__/  /$$$$$$   /$$$$$$$| $$$$$$$ | $$      | $$  /$$$$$$  /$$  /$$  /$$");
+Console.WriteLine("| $$       |____  $$ /$$_____/| $$__  $$| $$$$$   | $$ /$$__  $$| $$ | $$ | $$");
+Console.WriteLine("| $$        /$$$$$$$|  $$$$$$ | $$  \\ $$| $$__/   | $$| $$  \\ $$| $$ | $$ | $$");
+Console.WriteLine("| $$    $$ /$$__  $$ \\____  $$| $$  | $$| $$      | $$| $$  | $$| $$ | $$ | $$");
+Console.WriteLine("|  $$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$| $$      | $$|  $$$$$$/|  $$$$$/$$$$/");
+Console.WriteLine(" \\______/  \\_______/|_______/ |__/  |__/|__/      |__/ \\______/  \\_____/\\___/ ");
+Console.WriteLine();
+Console.WriteLine();
+
+// Validate database connection FIRST before any services try to access it
 try
 {
     Console.WriteLine("Checking database connection...");
     await entities.ValidateDatabaseConnectionAsync();
     Console.WriteLine("Database connection successful!\n");
-    Console.WriteLine("  /$$$$$$                      /$$       /$$$$$$$$ /$$                        ");
-    Console.WriteLine(" /$$__  $$                    | $$      | $$_____/| $$                        ");
-    Console.WriteLine("| $$  \\__/  /$$$$$$   /$$$$$$$| $$$$$$$ | $$      | $$  /$$$$$$  /$$  /$$  /$$");
-    Console.WriteLine("| $$       |____  $$ /$$_____/| $$__  $$| $$$$$   | $$ /$$__  $$| $$ | $$ | $$");
-    Console.WriteLine("| $$        /$$$$$$$|  $$$$$$ | $$  \\ $$| $$__/   | $$| $$  \\ $$| $$ | $$ | $$");
-    Console.WriteLine("| $$    $$ /$$__  $$ \\____  $$| $$  | $$| $$      | $$| $$  | $$| $$ | $$ | $$");
-    Console.WriteLine("|  $$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$| $$      | $$|  $$$$$$/|  $$$$$/$$$$/");
-    Console.WriteLine(" \\______/  \\_______/|_______/ |__/  |__/|__/      |__/ \\______/  \\_____/\\___/ ");
-    Console.WriteLine();
-    Console.WriteLine();
 }
 catch (InvalidOperationException ex)
 {
     Console.Error.WriteLine(ex.Message);
-    Console.WriteLine("\nPress any key to exit...");
-    Console.ReadKey();
     return;
 }
 
-// Initialize repositories
-var vendorsDbRepo = new DatabaseVendorsRepository(entities);
-var categoriesDbRepo = new DatabaseCategoriesRepository(entities);
+// Initialize repositories and services with error handling
+DatabaseVendorsRepository vendorsDbRepo;
+DatabaseCategoriesRepository categoriesDbRepo;
+TransactionTypeDetector typeDetector;
+BudgetService budgetService;
+VendorsService vendorsService;
+CategoriesService categoriesService;
+TransferManagementService transferManagementService;
+TransactionReprocessingService reprocessingService;
 
-// Initialize transaction type detector
-var typeDetector = new TransactionTypeDetector();
+try
+{
+    vendorsDbRepo = new DatabaseVendorsRepository(entities);
+    categoriesDbRepo = new DatabaseCategoriesRepository(entities);
+    typeDetector = new TransactionTypeDetector();
 
-// Initialize services
-var budgetService = new BudgetService(
-    new DatabaseBudgetRepository(entities),
-    TransactionsConsoleUserInteraction,
-    null); // JSON repository removed for budget profiles
+    budgetService = new BudgetService(
+        new DatabaseBudgetRepository(entities),
+        TransactionsConsoleUserInteraction,
+        null);
 
-var vendorsService = new VendorsService(
-    vendorsDbRepo,
-    null,
-    TransactionsConsoleUserInteraction);
+    vendorsService = new VendorsService(
+        vendorsDbRepo,
+        null,
+        TransactionsConsoleUserInteraction);
 
-var categoriesService = new CategoriesService(
-    categoriesDbRepo,
-    null,
-    TransactionsConsoleUserInteraction,
-    typeDetector);
+    categoriesService = new CategoriesService(
+        categoriesDbRepo,
+        null,
+        TransactionsConsoleUserInteraction,
+        typeDetector);
 
-var transferManagementService = new TransferManagementService(
-    TransactionsConsoleUserInteraction,
-    new SqlServerTransactionRepository<RBCTransaction>(entities),
-    new SqlServerTransactionRepository<AmexTransaction>(entities),
-    new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
-    categoriesService);
+    transferManagementService = new TransferManagementService(
+        TransactionsConsoleUserInteraction,
+        new SqlServerTransactionRepository<RBCTransaction>(entities),
+        new SqlServerTransactionRepository<AmexTransaction>(entities),
+        new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
+        categoriesService);
 
-var reprocessingService = new TransactionReprocessingService(
-    new SqlServerTransactionRepository<RBCTransaction>(entities),
-    new SqlServerTransactionRepository<AmexTransaction>(entities),
-    new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
-    vendorsService,
-    categoriesService,
-    budgetService);
+    reprocessingService = new TransactionReprocessingService(
+        new SqlServerTransactionRepository<RBCTransaction>(entities),
+        new SqlServerTransactionRepository<AmexTransaction>(entities),
+        new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
+        vendorsService,
+        categoriesService,
+        budgetService);
+}
+catch (Npgsql.PostgresException ex) when (ex.SqlState == "28P01" || ex.Message.Contains("password authentication failed"))
+{
+    Console.Error.WriteLine(BoxFormatter.CreateErrorBox(
+        "AUTHENTICATION FAILED",
+        "The database password is incorrect or has been changed.",
+        "",
+        "To fix this:",
+        "  1. Open PersonalFinancesApp/appsettings.json",
+        "  2. Find the line with 'Password=YOUR_NEW_PASSWORD_HERE'",
+        "  3. Replace YOUR_NEW_PASSWORD_HERE with your actual password",
+        "  4. Save the file and run the application again",
+        "",
+        "Need help? See PASSWORD_UPDATE_GUIDE.md"
+    ));
+    return;
+}
+catch (Npgsql.NpgsqlException ex) when (ex.Message.Contains("password authentication failed"))
+{
+    Console.Error.WriteLine(BoxFormatter.CreateErrorBox(
+        "AUTHENTICATION FAILED",
+        "The database password is incorrect.",
+        "",
+        "To fix this:",
+        "  1. Open PersonalFinancesApp/appsettings.json",
+        "  2. Update the password in the connection string",
+        "  3. Save and run again",
+        "",
+        "See PASSWORD_UPDATE_GUIDE.md for detailed instructions"
+    ));
+    return;
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine(BoxFormatter.CreateErrorBox(
+        "DATABASE INITIALIZATION FAILED",
+        $"Error: {ex.Message}",
+        "",
+        "This could be due to:",
+        "  - Missing or incorrect appsettings.json configuration",
+        "  - Database connection issues",
+        "  - Invalid credentials"
+    ));
+    return;
+}
 
 // Check for utility commands
 if (args.Length > 0)
