@@ -18,6 +18,7 @@ class PersonalFinancesApp
     private readonly IBudgetService _budgetService;
     private readonly ITransferManagementService _transferManagementService;
     private readonly ITransactionReprocessingService _reprocessingService;
+    private Dictionary<string, bool> _categoryTrackedOnlyCache = new();
 
     public PersonalFinancesApp(
         IFileTransactionRepository<RBCTransaction> rbcCsvRepository,
@@ -86,10 +87,47 @@ class PersonalFinancesApp
         }
     }
 
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            // Try to get the database repository
+            var categoriesService = _categoriesService as CategoriesService;
+            if (categoriesService != null)
+            {
+                // Access the internal repository (assuming it's DatabaseCategoriesRepository)
+                var dbRepoField = categoriesService.GetType().GetField("_categoriesRepository",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                if (dbRepoField != null)
+                {
+                    var dbRepo = dbRepoField.GetValue(categoriesService) as DatabaseCategoriesRepository;
+                    if (dbRepo != null)
+                    {
+                        var categories = await dbRepo.GetAllCategoriesAsync();
+                        _categoryTrackedOnlyCache = categories.ToDictionary(
+                            c => c.CategoryName,
+                            c => c.IsTrackedOnly,
+                            StringComparer.OrdinalIgnoreCase
+                        );
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _transactionUserInteraction.ShowMessage($"Warning: Could not load category cache: {ex.Message}");
+        }
+    }
+
     public async Task RunAsync(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString)
     {
         // load data from sources
-        Console.WriteLine("Finances App Initialized\n");
+        Console.WriteLine("CashFlow App Initialized\n");
+
+        // Load category cache for tracked-only detection
+        await LoadCategoriesAsync();
+
         List<string> categories = _categoriesService.GetAllCategories();
 
         BudgetProfile? profile = null;
@@ -457,6 +495,7 @@ class PersonalFinancesApp
         {
             var categorizedTransactions = budgetedExpenses
                 .Where(transaction => transaction.Category == category)
+                .OrderBy(transaction => transaction.Date)
                 .ToList();
 
             if (profile.BudgetCategories.Any(c => c.Key.ToLower() == category.ToLower()) && categorizedTransactions.Any())
@@ -485,6 +524,7 @@ class PersonalFinancesApp
             {
                 var trackedTransactions = trackedOnlyExpenses
                     .Where(t => t.Category == category)
+                    .OrderBy(t => t.Date)
                     .ToList();
 
                 _transactionUserInteraction.OutputTransactions(trackedTransactions, $"{category} (Tracked)", null);
@@ -529,6 +569,7 @@ class PersonalFinancesApp
         // === UNCATEGORIZED TRANSACTIONS ===
         var uncategorizedExpenses = filteredTransactions
             .Where(t => t.Type == TransactionType.Expense && string.IsNullOrEmpty(t.Category))
+            .OrderBy(t => t.Date)
             .ToList();
 
         if (uncategorizedExpenses.Any())
@@ -543,7 +584,23 @@ class PersonalFinancesApp
         // === UNPROCESSED TRANSACTIONS ===
         var unprocessedTransactions = filteredTransactions
             .Where(t => t.Type == 0 || t.Type == default(TransactionType))
+            .OrderBy(t => t.Date)
             .ToList();
+
+        // === TRANSACTION RECONCILIATION VALIDATION ===
+        // Ensure every transaction is accounted for in exactly one group
+        var totalInGroups = budgetedExpenses.Count + trackedOnlyExpenses.Count +
+                           transfers.Count + income.Count + adjustments.Count +
+                           uncategorizedExpenses.Count + unprocessedTransactions.Count;
+
+        if (totalInGroups != filteredTransactions.Count)
+        {
+            Console.WriteLine($"\n⚠️  WARNING: Transaction count mismatch!");
+            Console.WriteLine($"   Total transactions: {filteredTransactions.Count}");
+            Console.WriteLine($"   Accounted for: {totalInGroups}");
+            Console.WriteLine($"   Difference: {filteredTransactions.Count - totalInGroups}");
+            Console.WriteLine("   Some transactions may be missing or double-counted!\n");
+        }
 
         if (unprocessedTransactions.Any())
         {
@@ -572,7 +629,11 @@ class PersonalFinancesApp
     private List<Transaction> GetBudgetedExpenses(List<Transaction> transactions)
     {
         return transactions
-            .Where(t => t.Type == TransactionType.Expense && !IsCategoryTrackedOnly(t.Category))
+            .Where(t =>
+                t.Type == TransactionType.Expense &&
+                !string.IsNullOrEmpty(t.Category) &&  // Exclude uncategorized (handled separately)
+                !IsCategoryTrackedOnly(t.Category))   // Exclude tracked-only expenses
+            .OrderBy(t => t.Date)
             .ToList();
     }
 
@@ -583,6 +644,7 @@ class PersonalFinancesApp
     {
         return transactions
             .Where(t => t.Type == TransactionType.Expense && IsCategoryTrackedOnly(t.Category))
+            .OrderBy(t => t.Date)
             .ToList();
     }
 
@@ -604,6 +666,7 @@ class PersonalFinancesApp
     {
         return transactions
             .Where(t => t.Type == TransactionType.Income)
+            .OrderBy(t => t.Date)
             .ToList();
     }
 
@@ -614,6 +677,7 @@ class PersonalFinancesApp
     {
         return transactions
             .Where(t => t.Type == TransactionType.Adjustment)
+            .OrderBy(t => t.Date)
             .ToList();
     }
 
@@ -625,17 +689,10 @@ class PersonalFinancesApp
         if (string.IsNullOrEmpty(categoryName))
             return false;
 
-        // Check in database via repository
-        var categoriesRepo = _categoriesService as CategoriesService;
-        if (categoriesRepo != null)
-        {
-            // Note: This would require adding a synchronous method to check IsTrackedOnly
-            // For now, we'll assume categories with specific names are tracked-only
-            // This can be enhanced later with proper database lookup
-            return false; // Will be properly implemented when we have sync access to Category.IsTrackedOnly
-        }
-
-        return false;
+        // Use the cache loaded during initialization
+        return _categoryTrackedOnlyCache.TryGetValue(categoryName, out bool isTrackedOnly)
+            ? isTrackedOnly
+            : false;
     }
 
     /// <summary>

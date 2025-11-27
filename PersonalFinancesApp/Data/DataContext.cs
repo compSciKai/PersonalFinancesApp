@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using PersonalFinances.Models;
+using Npgsql;
 
 namespace PersonalFinances.Data;
 
@@ -109,5 +110,63 @@ public class  TransactionContext : DbContext
                   .IsUnique()
                   .HasDatabaseName("IX_Category_CategoryName");
         });
+    }
+
+    /// <summary>
+    /// Validates that the database connection is working and provides user-friendly error messages.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when connection fails with details about the issue.</exception>
+    public async Task ValidateDatabaseConnectionAsync()
+    {
+        try
+        {
+            // Try to open a connection and execute a simple query
+            await Database.CanConnectAsync();
+        }
+        catch (PostgresException ex) when (ex.SqlState == "XX000" || ex.Message.Contains("Tenant or user not found"))
+        {
+            throw new InvalidOperationException(
+                "\n╔═══════════════════════════════════════════════════════════════════════╗\n" +
+                "║                    DATABASE CONNECTION FAILED                         ║\n" +
+                "╠═══════════════════════════════════════════════════════════════════════╣\n" +
+                "║ Your Supabase project appears to be paused.                           ║\n" +
+                "║                                                                       ║\n" +
+                "║ Free tier Supabase projects pause after 7 days of inactivity.         ║\n" +
+                "║                                                                       ║\n" +
+                "║ To fix this:                                                          ║\n" +
+                "║   1. Go to https://supabase.com/dashboard                             ║\n" +
+                "║   2. Select your project                                              ║\n" +
+                "║   3. Click 'Restore project' or 'Unpause'                             ║\n" +
+                "║   4. Wait a few moments for the database to become active             ║\n" +
+                "║   5. Run this application again                                       ║\n" +
+                "╚═══════════════════════════════════════════════════════════════════════╝\n",
+                ex);
+        }
+        catch (NpgsqlException ex)
+        {
+            throw new InvalidOperationException(
+                "\n╔═══════════════════════════════════════════════════════════════════════╗\n" +
+                "║                    DATABASE CONNECTION FAILED                         ║\n" +
+                "╠═══════════════════════════════════════════════════════════════════════╣\n" +
+                $"║ Error: {ex.Message.PadRight(67)}║\n" +
+                "║                                                                       ║\n" +
+                "║ Possible causes:                                                      ║\n" +
+                "║   - Supabase project is paused (check dashboard)                      ║\n" +
+                "║   - Network connectivity issues                                       ║\n" +
+                "║   - Invalid credentials                                               ║\n" +
+                "║   - Database server is down                                           ║\n" +
+                "╚═══════════════════════════════════════════════════════════════════════╝\n",
+                ex);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"\n╔═══════════════════════════════════════════════════════════════════════╗\n" +
+                "║                    DATABASE CONNECTION FAILED                         ║\n" +
+                "╠═══════════════════════════════════════════════════════════════════════╣\n" +
+                $"║ Unexpected error: {ex.Message.PadRight(56)}║\n" +
+                "╚═══════════════════════════════════════════════════════════════════════╝\n",
+                ex);
+        }
     }
 }

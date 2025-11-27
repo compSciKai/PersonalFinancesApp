@@ -167,6 +167,13 @@ public class DatabaseCategoriesRepository : ICategoriesRepository
             .FirstOrDefaultAsync(c => c.CategoryName.ToLower() == categoryName.ToLower());
     }
 
+    public async Task<List<Category>> GetAllCategoriesAsync()
+    {
+        return await _context.Categories
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
     private string ToTitleCase(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return input;

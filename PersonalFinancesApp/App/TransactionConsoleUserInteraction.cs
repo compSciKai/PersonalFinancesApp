@@ -88,9 +88,13 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         table.Rows.Add(subtotalsRow);
 
         // TODO: move to method -- calculate budget
-        if (profile is not null && profile.BudgetCategories.ContainsKey(tableName))
+        // Case-insensitive lookup for budget category
+        var budgetCategory = profile?.BudgetCategories.FirstOrDefault(c =>
+            c.Key.Equals(tableName, StringComparison.OrdinalIgnoreCase));
+
+        if (budgetCategory.HasValue && budgetCategory.Value.Key != null)
         {
-            decimal limit = (decimal)profile.BudgetCategories[tableName];
+            decimal limit = (decimal)budgetCategory.Value.Value;
             decimal remaining = limit + totalExpenses;
 
 
@@ -121,13 +125,16 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         DataTable table = MakeTransactionsTable(tableName.ToUpper());
         table.Columns[0].SetShowColumnName(false);
 
-        foreach (var transaction in transactions)
+        // Sort transactions by date ascending
+        var sortedTransactions = transactions.OrderBy(t => t.Date).ToList();
+
+        foreach (var transaction in sortedTransactions)
         {
             string? vendor = transaction.Vendor?.ToUpper();
             string? category = transaction.Category?.ToUpper();
 
             DataRow row = table.NewRow();
-            row["ID"] = transactions.IndexOf(transaction) + 1;
+            row["ID"] = sortedTransactions.IndexOf(transaction) + 1;
             row["Account Type"] = transaction.AccountType;
             row["Date"] = transaction.Date.ToShortDateString();
             row["Vendor Name"] = vendor;
