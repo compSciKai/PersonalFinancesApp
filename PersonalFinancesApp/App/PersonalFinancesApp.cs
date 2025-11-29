@@ -471,7 +471,7 @@ class PersonalFinancesApp
             }
         }
 
-        filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
+        // filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
 
         string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
         string tableName = rangeType is not null ? $"{rangeType} Transactions" : "Transactions";
@@ -494,7 +494,7 @@ class PersonalFinancesApp
         foreach (string category in categories)
         {
             var categorizedTransactions = budgetedExpenses
-                .Where(transaction => transaction.Category == category)
+                .Where(transaction => string.Equals(transaction.Category, category, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(transaction => transaction.Date)
                 .ToList();
 
@@ -523,7 +523,7 @@ class PersonalFinancesApp
             foreach (var category in trackedCategories)
             {
                 var trackedTransactions = trackedOnlyExpenses
-                    .Where(t => t.Category == category)
+                    .Where(t => string.Equals(t.Category, category, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(t => t.Date)
                     .ToList();
 

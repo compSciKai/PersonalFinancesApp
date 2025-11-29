@@ -6,7 +6,7 @@ namespace PersonalFinances.Utilities;
 public static class BoxFormatter
 {
     private const int DefaultBoxWidth = 71; // Total width including borders
-    private const int ContentWidth = 69; // Width between the borders (71 - 2)
+    private const int ContentWidth = 67; // Width for content (71 - 2 borders - 2 spaces)
 
     /// <summary>
     /// Formats a line of text to fit within a box with proper padding.
@@ -16,7 +16,7 @@ public static class BoxFormatter
     /// <returns>Formatted line with borders and proper padding</returns>
     public static string FormatLine(string content, int boxWidth = DefaultBoxWidth)
     {
-        int contentWidth = boxWidth - 2; // Subtract 2 for the left and right borders
+        int contentWidth = boxWidth - 4; // Subtract 2 for borders + 2 for spacing
 
         if (content.Length > contentWidth)
         {
@@ -70,14 +70,14 @@ public static class BoxFormatter
     /// <summary>
     /// Centers text within the content width.
     /// </summary>
-    private static string CenterText(string text)
+    private static string CenterText(string text, int contentWidth = ContentWidth)
     {
-        if (text.Length >= ContentWidth)
+        if (text.Length >= contentWidth)
         {
-            return text.Substring(0, ContentWidth);
+            return text.Substring(0, contentWidth);
         }
 
-        int totalPadding = ContentWidth - text.Length;
+        int totalPadding = contentWidth - text.Length;
         int leftPadding = totalPadding / 2;
         int rightPadding = totalPadding - leftPadding;
 
