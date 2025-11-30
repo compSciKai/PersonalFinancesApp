@@ -722,15 +722,15 @@ class PersonalFinancesApp
 
                 if (linkedTransfer != null)
                 {
-                    // Display as a matched pair
-                    var outTransfer = transfer.Amount < 0 ? transfer : linkedTransfer;
-                    var inTransfer = transfer.Amount > 0 ? transfer : linkedTransfer;
+                    // Display as a matched pair with correct directions for each transaction
+                    var direction1 = GetTransferDirection(transfer);
+                    var direction2 = GetTransferDirection(linkedTransfer);
 
-                    var outAccount = GetFormattedAccountInfo(outTransfer);
-                    var inAccount = GetFormattedAccountInfo(inTransfer);
+                    var account1 = GetFormattedAccountInfo(transfer);
+                    var account2 = GetFormattedAccountInfo(linkedTransfer);
 
-                    Console.WriteLine($"{outTransfer.Date:MMM dd}  {outAccount,-20} {outTransfer.Description,-40} ${Math.Abs(outTransfer.Amount),10:N2} ↑ OUT ↔");
-                    Console.WriteLine($"{inTransfer.Date:MMM dd}  {inAccount,-20} {inTransfer.Description,-40} ${Math.Abs(inTransfer.Amount),10:N2} ↓ IN   ✓ Reconciled\n");
+                    Console.WriteLine($"{transfer.Date:MMM dd}  {account1,-20} {transfer.Description,-40} ${Math.Abs(transfer.Amount),10:N2} {direction1} ↔");
+                    Console.WriteLine($"{linkedTransfer.Date:MMM dd}  {account2,-20} {linkedTransfer.Description,-40} ${Math.Abs(linkedTransfer.Amount),10:N2} {direction2}  ✓ Reconciled\n");
 
                     displayedIds.Add(transfer.Id);
                     displayedIds.Add(linkedTransfer.Id);
@@ -740,7 +740,7 @@ class PersonalFinancesApp
 
             // Display as unmatched transfer
             var account = GetFormattedAccountInfo(transfer);
-            var direction = transfer.Amount < 0 ? "↑ OUT" : "↓ IN ";
+            var direction = GetTransferDirection(transfer);
             Console.WriteLine($"{transfer.Date:MMM dd}  {account,-20} {transfer.Description,-40} ${Math.Abs(transfer.Amount),10:N2} {direction}  ⚠ Unmatched");
 
             displayedIds.Add(transfer.Id);
@@ -766,5 +766,22 @@ class PersonalFinancesApp
         }
 
         return transaction.AccountType;
+    }
+
+    /// <summary>
+    /// Get transfer direction (IN/OUT) respecting bank-specific amount conventions
+    /// </summary>
+    private string GetTransferDirection(Transaction transaction)
+    {
+        if (transaction.isNegativeAmounts)
+        {
+            // RBC, PC Financial: negative amounts = money out, positive = money in
+            return transaction.Amount < 0 ? "↑ OUT" : "↓ IN ";
+        }
+        else
+        {
+            // Amex: positive amounts = money out, negative = money in
+            return transaction.Amount > 0 ? "↑ OUT" : "↓ IN ";
+        }
     }
 }

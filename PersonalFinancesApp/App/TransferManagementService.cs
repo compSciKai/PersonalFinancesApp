@@ -38,7 +38,7 @@ public class TransferManagementService : ITransferManagementService
         Console.WriteLine("═══════════════════════════════════════════════════════════\n");
 
         // Step 1: E-Transfer Review
-        await ReviewETransfersAsync(transactions);
+        await ReviewETransfersAsync(transactions, profile);
 
         // Step 2: Automatic Transfer Matching
         await MatchTransfersAsync(transactions);
@@ -55,7 +55,7 @@ public class TransferManagementService : ITransferManagementService
     /// <summary>
     /// Step 1: Review E-Transfers and allow reclassification
     /// </summary>
-    private async Task ReviewETransfersAsync(List<Transaction> transactions)
+    private async Task ReviewETransfersAsync(List<Transaction> transactions, BudgetProfile profile)
     {
         var eTransfers = transactions
             .Where(t => t.Type == TransactionType.Transfer &&
@@ -97,7 +97,7 @@ public class TransferManagementService : ITransferManagementService
             if (int.TryParse(input, out int index) && index > 0 && index <= eTransfers.Count)
             {
                 var transaction = eTransfers[index - 1];
-                await ReclassifyAsExpenseAsync(transaction);
+                await ReclassifyAsExpenseAsync(transaction, profile);
             }
             else if (!string.IsNullOrEmpty(input))
             {
@@ -119,9 +119,23 @@ public class TransferManagementService : ITransferManagementService
     /// <summary>
     /// Reclassify a transaction as an Expense and prompt for category
     /// </summary>
-    private async Task ReclassifyAsExpenseAsync(Transaction transaction)
+    private async Task ReclassifyAsExpenseAsync(Transaction transaction, BudgetProfile? profile)
     {
-        Console.Write($"\nReclassifying: {transaction.Description}\n");
+        Console.WriteLine($"\nReclassifying: {transaction.Description}");
+
+        // Display available categories from budget profile
+        if (profile != null && profile.BudgetCategories.Any())
+        {
+            Console.WriteLine("\nAvailable categories:");
+            int index = 1;
+            foreach (var categoryName in profile.BudgetCategories.Keys.OrderBy(c => c))
+            {
+                Console.WriteLine($"  {index}. {categoryName}");
+                index++;
+            }
+            Console.WriteLine();
+        }
+
         Console.Write("Enter category name: ");
         var category = Console.ReadLine()?.Trim();
 
@@ -268,9 +282,13 @@ public class TransferManagementService : ITransferManagementService
     {
         int score = 0;
 
-        // Exact amount match (opposite signs)
+        // Exact amount match with opposite directions
+        // Use GetTransferDirection to respect bank-specific amount conventions
+        var t1Direction = GetTransferDirection(t1);
+        var t2Direction = GetTransferDirection(t2);
+
         if (Math.Abs(Math.Abs(t1.Amount) - Math.Abs(t2.Amount)) < 0.01m &&
-            ((t1.Amount > 0 && t2.Amount < 0) || (t1.Amount < 0 && t2.Amount > 0)))
+            t1Direction != t2Direction)  // One is OUT, other is IN
         {
             score += 3;
         }
@@ -332,7 +350,7 @@ public class TransferManagementService : ITransferManagementService
             switch (choice)
             {
                 case "1":
-                    await ReclassifyAsExpenseAsync(trans);
+                    await ReclassifyAsExpenseAsync(trans, profile);
                     break;
                 case "2":
                     trans.Type = TransactionType.Income;
