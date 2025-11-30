@@ -10,20 +10,21 @@ public class TransactionTypeDetector
     private readonly string[] _transferKeywords = new[]
     {
         "transfer", "e-transfer", "etransfer", "e-trf", "interac",
-        "withdrawal", "deposit to", "payment to account",
+        "withdrawal", "deposit to", "payment to account", "payment", "bill payment",
         "tfsa", "rrsp", "loan payment", "mortgage", "credit payment"
     };
 
     private readonly string[] _adjustmentKeywords = new[]
     {
-        "fee", "interest charge", "overdraft",
+        "fee", "interest charge", "overdraft", "pre-authorized",
         "cashback", "reward", "refund", "reversal"
     };
 
     private readonly string[] _incomeKeywords = new[]
     {
         "income", "salary", "ei", "ei canada", "employment insurance",
-        "tax refund", "deposit", "reimbursement", "payroll"
+        "tax refund", "reimbursement", "payroll deposit",
+        "deposit interest", "bonus dep", "interest payment"
     };
 
     /// <summary>

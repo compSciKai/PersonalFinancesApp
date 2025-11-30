@@ -172,9 +172,9 @@ public class CategoriesService : ICategoriesService
                 transaction.Category = categoryName;
             }
 
-            // Auto-detect transaction type for ALL transactions with categories (whether just assigned or pre-existing)
-            // This handles reprocessing scenarios where transactions have categories but Type=0
-            if (transaction.Category != null && (transaction.Type == TransactionType.Expense || transaction.Type == 0))
+            // Auto-detect transaction type ONLY for unprocessed transactions (Type=0)
+            // Do NOT re-detect for manually classified transactions (e.g., transfers reclassified as expenses)
+            if (transaction.Category != null && transaction.Type == 0)
             {
                 // Try to get VendorMapping from database for more accurate detection
                 VendorMapping? vendorMapping = null;

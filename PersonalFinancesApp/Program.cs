@@ -24,6 +24,10 @@ var configuration = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
     .Build();
 
+// Load transfer management settings
+var transferSettings = new TransferManagementSettings();
+configuration.GetSection("TransferManagement").Bind(transferSettings);
+
 // Initialize database context with configuration
 TransactionContext.Initialize(configuration);
 
@@ -93,7 +97,8 @@ try
         new SqlServerTransactionRepository<RBCTransaction>(entities),
         new SqlServerTransactionRepository<AmexTransaction>(entities),
         new SqlServerTransactionRepository<PCFinancialTransaction>(entities),
-        categoriesService);
+        categoriesService,
+        transferSettings);
 
     reprocessingService = new TransactionReprocessingService(
         new SqlServerTransactionRepository<RBCTransaction>(entities),

@@ -133,13 +133,16 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             string? vendor = transaction.Vendor?.ToUpper();
             string? category = transaction.Category?.ToUpper();
 
+            // Add adjustment indicator for categorized adjustment transactions
+            string typeIndicator = transaction.Type == TransactionType.Adjustment ? " ⚡" : "";
+
             DataRow row = table.NewRow();
             row["ID"] = sortedTransactions.IndexOf(transaction) + 1;
             row["Account Type"] = transaction.AccountType;
             row["Date"] = transaction.Date.ToShortDateString();
             row["Vendor Name"] = vendor;
             row["Category"] = category;
-            row["Description"] = transaction.Description;
+            row["Description"] = transaction.Description + typeIndicator;
 
             if (!transaction.isNegativeAmounts)
             {

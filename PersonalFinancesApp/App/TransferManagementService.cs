@@ -10,19 +10,22 @@ public class TransferManagementService : ITransferManagementService
     private readonly ITransactionRepository<AmexTransaction> _amexRepository;
     private readonly ITransactionRepository<PCFinancialTransaction> _pcRepository;
     private readonly ICategoriesService _categoriesService;
+    private readonly TransferManagementSettings _settings;
 
     public TransferManagementService(
         ITransactionsUserInteraction userInteraction,
         ITransactionRepository<RBCTransaction> rbcRepository,
         ITransactionRepository<AmexTransaction> amexRepository,
         ITransactionRepository<PCFinancialTransaction> pcRepository,
-        ICategoriesService categoriesService)
+        ICategoriesService categoriesService,
+        TransferManagementSettings settings)
     {
         _userInteraction = userInteraction;
         _rbcRepository = rbcRepository;
         _amexRepository = amexRepository;
         _pcRepository = pcRepository;
         _categoriesService = categoriesService;
+        _settings = settings;
     }
 
     /// <summary>
@@ -72,7 +75,7 @@ public class TransferManagementService : ITransferManagementService
         {
             var trans = eTransfers[i];
             var account = GetFormattedAccountInfo(trans);
-            var direction = trans.Amount < 0 ? "↑ OUT" : "↓ IN ";
+            var direction = GetTransferDirection(trans);
             Console.WriteLine($"[{i + 1}] {trans.Date:MMM dd}  {account,-20} {trans.Description,-40} ${Math.Abs(trans.Amount),10:N2} {direction}");
         }
 
@@ -160,7 +163,9 @@ public class TransferManagementService : ITransferManagementService
             return;
         }
 
-        Console.WriteLine($"Searching for transfer matches among {transfers.Count} transfer(s)...\n");
+        Console.WriteLine($"Searching for transfer matches among {transfers.Count} transfer(s)...");
+        Console.WriteLine($"Using confidence threshold: {_settings.MinimumConfidenceThreshold} " +
+                         $"({GetThresholdLabel(_settings.MinimumConfidenceThreshold)}+)\n");
 
         var matchedCount = 0;
 
@@ -184,10 +189,12 @@ public class TransferManagementService : ITransferManagementService
 
                     var account1 = GetFormattedAccountInfo(trans1);
                     var account2 = GetFormattedAccountInfo(trans2);
+                    var direction1 = GetTransferDirection(trans1);
+                    var direction2 = GetTransferDirection(trans2);
 
                     Console.WriteLine($"Potential Match ({confidenceLabel} confidence):");
-                    Console.WriteLine($"  {trans1.Date:MMM dd}  {account1,-20} {trans1.Description,-40} ${Math.Abs(trans1.Amount),10:N2} ↑ OUT");
-                    Console.WriteLine($"  {trans2.Date:MMM dd}  {account2,-20} {trans2.Description,-40} ${Math.Abs(trans2.Amount),10:N2} ↓ IN");
+                    Console.WriteLine($"  {trans1.Date:MMM dd}  {account1,-20} {trans1.Description,-40} ${Math.Abs(trans1.Amount),10:N2} {direction1}");
+                    Console.WriteLine($"  {trans2.Date:MMM dd}  {account2,-20} {trans2.Description,-40} ${Math.Abs(trans2.Amount),10:N2} {direction2}");
                     Console.Write("\nLink these transactions? (y/n): ");
 
                     var confirm = Console.ReadLine()?.Trim().ToLower();
@@ -238,7 +245,7 @@ public class TransferManagementService : ITransferManagementService
 
             var score = CalculateMatchScore(transaction, other);
 
-            if (score >= 3) // Minimum threshold
+            if (score >= _settings.MinimumConfidenceThreshold)
             {
                 var confidence = score >= 5 ? "High" : score >= 4 ? "Medium" : "Low";
                 matches.Add(new TransferMatch
@@ -311,7 +318,7 @@ public class TransferManagementService : ITransferManagementService
         foreach (var trans in unmatchedTransfers)
         {
             var account = GetFormattedAccountInfo(trans);
-            var direction = trans.Amount < 0 ? "↑ OUT" : "↓ IN ";
+            var direction = GetTransferDirection(trans);
             Console.WriteLine($"\n{trans.Date:MMM dd}  {account,-20} {trans.Description,-40} ${Math.Abs(trans.Amount),10:N2} {direction}");
             Console.WriteLine("\nOptions:");
             Console.WriteLine("  [1] Reclassify as Expense (specify category)");
@@ -381,6 +388,37 @@ public class TransferManagementService : ITransferManagementService
         }
 
         return transaction.AccountType;
+    }
+
+    /// <summary>
+    /// Get human-readable label for confidence threshold
+    /// </summary>
+    private string GetThresholdLabel(int threshold)
+    {
+        return threshold switch
+        {
+            5 => "High",
+            4 => "Medium",
+            3 => "Low",
+            _ => "Custom"
+        };
+    }
+
+    /// <summary>
+    /// Get transfer direction (IN/OUT) respecting bank-specific amount conventions
+    /// </summary>
+    private string GetTransferDirection(Transaction transaction)
+    {
+        if (transaction.isNegativeAmounts)
+        {
+            // RBC, PC Financial: negative amounts = money out, positive = money in
+            return transaction.Amount < 0 ? "↑ OUT" : "↓ IN ";
+        }
+        else
+        {
+            // Amex: positive amounts = money out, negative = money in
+            return transaction.Amount > 0 ? "↑ OUT" : "↓ IN ";
+        }
     }
 
     /// <summary>

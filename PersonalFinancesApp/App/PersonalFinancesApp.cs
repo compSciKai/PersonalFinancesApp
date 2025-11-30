@@ -383,6 +383,7 @@ class PersonalFinancesApp
         }
 
         // Get new transactions from CSV repository
+        Console.WriteLine("\n🔄 Loading transactions from CSV files...");
         if (transactionsDictionary != null)
         {
             foreach (var transactionEntry in transactionsDictionary)
@@ -414,9 +415,11 @@ class PersonalFinancesApp
         }
 
         // fetch all transactions
+        Console.WriteLine("🔄 Fetching transactions from database...");
         var rbcTransactions = await _rbcSqlRepository.GetAllAsync();
         var amexTransactions = await _amexSqlRepository.GetAllAsync();
         var pcTransactions = await _pcSqlRepository.GetAllAsync();
+        Console.WriteLine($"✓ Loaded {rbcTransactions.Count + amexTransactions.Count + pcTransactions.Count} transactions from database\n");
 
         var allTransactions = new List<Transaction>();
         allTransactions.AddRange(rbcTransactions);
@@ -433,6 +436,7 @@ class PersonalFinancesApp
         }
 
         // Now process only the filtered transactions - user only sees prompts for relevant date range
+        Console.WriteLine($"🔄 Processing {filteredTransactions.Count} transactions in selected range...\n");
         List<Transaction> transactionsWithVendors = await _vendorsService.AddVendorsToTransactionsAsync(filteredTransactions);
         List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors, profile, _budgetService);
 
@@ -555,15 +559,15 @@ class PersonalFinancesApp
             Console.WriteLine($"\nTotal Income: ${Math.Abs(income.Sum(t => t.Amount)):N2}\n");
         }
 
-        // === SECTION 5: ADJUSTMENTS ===
+        // === SECTION 5: UNCATEGORIZED ADJUSTMENTS ===
         if (adjustments.Any())
         {
             Console.WriteLine("\n═══════════════════════════════════════════════════════════");
-            Console.WriteLine("                      ADJUSTMENTS");
+            Console.WriteLine("              UNCATEGORIZED ADJUSTMENTS");
             Console.WriteLine("═══════════════════════════════════════════════════════════\n");
 
-            _transactionUserInteraction.OutputTransactions(adjustments, "Adjustments (Fees, Rewards, etc.)", null);
-            Console.WriteLine($"\nTotal Adjustments: ${adjustments.Sum(t => t.Amount):N2}\n");
+            _transactionUserInteraction.OutputTransactions(adjustments, "Uncategorized Adjustments", null);
+            Console.WriteLine($"\nTotal Uncategorized Adjustments: ${adjustments.Sum(t => t.Amount):N2}\n");
         }
 
         // === UNCATEGORIZED TRANSACTIONS ===
@@ -624,13 +628,13 @@ class PersonalFinancesApp
     }
 
     /// <summary>
-    /// Get expenses that are budgeted (not tracked-only)
+    /// Get expenses that are budgeted (not tracked-only), including categorized adjustments
     /// </summary>
     private List<Transaction> GetBudgetedExpenses(List<Transaction> transactions)
     {
         return transactions
             .Where(t =>
-                t.Type == TransactionType.Expense &&
+                (t.Type == TransactionType.Expense || t.Type == TransactionType.Adjustment) &&
                 !string.IsNullOrEmpty(t.Category) &&  // Exclude uncategorized (handled separately)
                 !IsCategoryTrackedOnly(t.Category))   // Exclude tracked-only expenses
             .OrderBy(t => t.Date)
@@ -638,12 +642,13 @@ class PersonalFinancesApp
     }
 
     /// <summary>
-    /// Get expenses that are tracked-only (not budgeted)
+    /// Get expenses that are tracked-only (not budgeted), including categorized adjustments
     /// </summary>
     private List<Transaction> GetTrackedOnlyExpenses(List<Transaction> transactions)
     {
         return transactions
-            .Where(t => t.Type == TransactionType.Expense && IsCategoryTrackedOnly(t.Category))
+            .Where(t => (t.Type == TransactionType.Expense || t.Type == TransactionType.Adjustment) &&
+                        IsCategoryTrackedOnly(t.Category))
             .OrderBy(t => t.Date)
             .ToList();
     }
@@ -671,12 +676,12 @@ class PersonalFinancesApp
     }
 
     /// <summary>
-    /// Get all adjustments (fees, rewards, etc.)
+    /// Get uncategorized adjustments only (categorized adjustments are grouped with their categories)
     /// </summary>
     private List<Transaction> GetAdjustments(List<Transaction> transactions)
     {
         return transactions
-            .Where(t => t.Type == TransactionType.Adjustment)
+            .Where(t => t.Type == TransactionType.Adjustment && string.IsNullOrEmpty(t.Category))
             .OrderBy(t => t.Date)
             .ToList();
     }
