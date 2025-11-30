@@ -509,6 +509,7 @@ class PersonalFinancesApp
         }
 
         // Output Budget Vs Actual for budgeted categories only
+        
         _transactionUserInteraction.OutputBudgetVsActual(budgetedExpenses, profile);
 
         // === SECTION 2: FIXED OBLIGATIONS (Tracked Only) ===

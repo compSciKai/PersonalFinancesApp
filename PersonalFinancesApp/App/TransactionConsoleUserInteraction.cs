@@ -399,21 +399,15 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                         {
                             ShowMessage($"  - {cat}");
                         }
-                        ShowMessage($"\nWould you like to add '{categoryValue}' to your budget? (y/n/s/sa)");
+                        ShowMessage($"\nWould you like to add '{categoryValue}' to your budget? (y/n)");
                         string addResponse = GetInput().Trim().ToLower();
 
                         if (addResponse == "y" || addResponse == "yes" || addResponse == "")
                         {
                             addToBudget = true;
                         }
-                        else if (addResponse == "s")
-                        {
-                            return (null, false, false, null, false);
-                        }
-                        else if (addResponse == "sa")
-                        {
-                            return (null, true, false, null, false);
-                        }
+                        // Any other response (n, etc.) means don't add to budget
+                        // Category will still be assigned at line 429
                     }
                 }
 
