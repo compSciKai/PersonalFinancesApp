@@ -486,6 +486,7 @@ class PersonalFinancesApp
         var transfers = GetTransfers(filteredTransactions);
         var income = GetIncome(filteredTransactions);
         var adjustments = GetAdjustments(filteredTransactions);
+        var unbudgetedExpenses = GetUnbudgetedExpenses(filteredTransactions, profile);
 
         // Output all transactions overview
         _transactionUserInteraction.OutputTransactions(filteredTransactions, tableName, null);
@@ -509,8 +510,11 @@ class PersonalFinancesApp
         }
 
         // Output Budget Vs Actual for budgeted categories only
-        
+
         _transactionUserInteraction.OutputBudgetVsActual(budgetedExpenses, profile);
+
+        // === SECTION 1.5: UNBUDGETED CATEGORIES ===
+        DisplayUnbudgetedCategories(unbudgetedExpenses);
 
         // === SECTION 2: FIXED OBLIGATIONS (Tracked Only) ===
         if (trackedOnlyExpenses.Any())
@@ -688,6 +692,31 @@ class PersonalFinancesApp
     }
 
     /// <summary>
+    /// Get expense transactions with categories NOT in the budget profile
+    /// </summary>
+    private List<Transaction> GetUnbudgetedExpenses(List<Transaction> transactions, BudgetProfile? profile)
+    {
+        // If no budget profile, consider all categorized expenses as budgeted
+        // (fallback to existing behavior - don't show as unbudgeted)
+        if (profile == null || !profile.BudgetCategories.Any())
+            return new List<Transaction>();
+
+        // Create case-insensitive set of budget category names
+        var budgetCategoryNames = new HashSet<string>(
+            profile.BudgetCategories.Keys,
+            StringComparer.OrdinalIgnoreCase);
+
+        return transactions
+            .Where(t =>
+                t.Type == TransactionType.Expense &&
+                !string.IsNullOrEmpty(t.Category) &&
+                !budgetCategoryNames.Contains(t.Category) &&
+                !IsCategoryTrackedOnly(t.Category))
+            .OrderBy(t => t.Date)
+            .ToList();
+    }
+
+    /// <summary>
     /// Check if a category is marked as tracked-only
     /// </summary>
     private bool IsCategoryTrackedOnly(string? categoryName)
@@ -784,5 +813,50 @@ class PersonalFinancesApp
             // Amex: positive amounts = money out, negative = money in
             return transaction.Amount > 0 ? "↑ OUT" : "↓ IN ";
         }
+    }
+
+    /// <summary>
+    /// Display unbudgeted categories section
+    /// </summary>
+    private void DisplayUnbudgetedCategories(List<Transaction> unbudgetedExpenses)
+    {
+        if (!unbudgetedExpenses.Any())
+            return;
+
+        // Group by category
+        var categoryGroups = unbudgetedExpenses
+            .GroupBy(t => t.Category)
+            .OrderBy(g => g.Key);
+
+        // Calculate summary stats
+        int categoryCount = categoryGroups.Count();
+        int transactionCount = unbudgetedExpenses.Count;
+        decimal totalAmount = unbudgetedExpenses.Sum(t => Math.Abs(t.Amount));
+
+        // Display summary
+        Console.WriteLine($"\nFound {categoryCount} unbudgeted {(categoryCount == 1 ? "category" : "categories")} " +
+                         $"({transactionCount} {(transactionCount == 1 ? "transaction" : "transactions")}, " +
+                         $"${totalAmount:N2} total)\n");
+
+        Console.WriteLine("═══════════════════════════════════════════════════════════");
+        Console.WriteLine("                 UNBUDGETED CATEGORIES");
+        Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+        // Display each category
+        foreach (var group in categoryGroups)
+        {
+            string categoryName = group.Key ?? "Unknown";
+            var categoryTransactions = group.OrderBy(t => t.Date).ToList();
+
+            // Display transactions for this category (table header already includes category name)
+            _transactionUserInteraction.OutputTransactions(categoryTransactions, categoryName, null);
+
+            // Calculate subtotal for this category
+            decimal subtotal = categoryTransactions.Sum(t => Math.Abs(t.Amount));
+            Console.WriteLine($"  Subtotal: ${subtotal:N2}\n");
+        }
+
+        // Display total
+        Console.WriteLine($"Total Unbudgeted Spending: ${totalAmount:N2}\n");
     }
 }

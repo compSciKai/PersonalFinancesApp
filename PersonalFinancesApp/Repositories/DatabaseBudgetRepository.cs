@@ -93,7 +93,8 @@ public class DatabaseBudgetRepository : IBudgetRepository
                 }
             }
 
-            _context.BudgetProfiles.Update(existing);
+            // Note: No need to call Update() since 'existing' is already tracked by EF Core.
+            // EF Core will automatically detect changes to the entity and its navigation properties.
         }
         else
         {

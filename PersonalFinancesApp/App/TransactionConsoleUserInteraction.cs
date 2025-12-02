@@ -451,21 +451,83 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         // Populate the final table
         foreach (var budgetCategory in profile.BudgetCategories)
         {
-            string category = budgetCategory.Key;
+            string categoryDisplay = budgetCategory.Key;
+            string categoryKey = budgetCategory.Key.ToLower();
             decimal budgeted = (decimal)budgetCategory.Value;
-            decimal actual = actualAmounts.ContainsKey(category) ? actualAmounts[category] : 0;
+            decimal actual = actualAmounts.ContainsKey(categoryKey) ? actualAmounts[categoryKey] : 0;
             decimal difference = budgeted + actual; // actual in negative figure
 
             DataRow row = finalTable.NewRow();
-            row["Category"] = category;
+            row["Category"] = categoryDisplay;
             row["Budgeted"] = budgeted;
             row["Actual"] = actual;
             row["Difference"] = difference;
             finalTable.Rows.Add(row);
         }
 
+        // Calculate totals for all categories
+        decimal totalBudgeted = finalTable.AsEnumerable()
+            .Sum(row => (decimal)row["Budgeted"]);
+
+        decimal totalActual = finalTable.AsEnumerable()
+            .Sum(row => (decimal)row["Actual"]);
+
+        decimal totalDifference = totalBudgeted + totalActual;
+
+        // Add TOTAL row
+        DataRow totalRow = finalTable.NewRow();
+        totalRow["Category"] = "TOTAL";
+        totalRow["Budgeted"] = totalBudgeted;
+        totalRow["Actual"] = totalActual;
+        totalRow["Difference"] = totalDifference;
+        finalTable.Rows.Add(totalRow);
+
+        // Add visual divider row
+        DataRow dividerRow = finalTable.NewRow();
+        dividerRow["Category"] = "────────────────────";
+        dividerRow["Budgeted"] = DBNull.Value;
+        dividerRow["Actual"] = DBNull.Value;
+        dividerRow["Difference"] = DBNull.Value;
+        finalTable.Rows.Add(dividerRow);
+
+        // Calculate performance metrics
+        decimal budgetUsedPercent = totalBudgeted != 0 ? (Math.Abs(totalActual) / totalBudgeted) * 100 : 0;
+        decimal variancePercent = totalBudgeted != 0 ? (totalDifference / totalBudgeted) * 100 : 0;
+
+        // Count categories under budget (where difference > 0)
+        int totalCategories = profile.BudgetCategories.Count;
+        int categoriesUnderBudget = finalTable.AsEnumerable()
+            .Take(totalCategories)  // Only count actual category rows, not TOTAL
+            .Count(row => (decimal)row["Difference"] > 0);
+
+        // Add BUDGET USED % row
+        DataRow budgetUsedRow = finalTable.NewRow();
+        budgetUsedRow["Category"] = $"BUDGET USED: {budgetUsedPercent:0.00}%";
+        budgetUsedRow["Budgeted"] = DBNull.Value;
+        budgetUsedRow["Actual"] = DBNull.Value;
+        budgetUsedRow["Difference"] = DBNull.Value;
+        finalTable.Rows.Add(budgetUsedRow);
+
+        // Add VARIANCE % row with +/- sign
+        string varianceSign = variancePercent >= 0 ? "+" : "";
+        DataRow varianceRow = finalTable.NewRow();
+        varianceRow["Category"] = $"VARIANCE: {varianceSign}{variancePercent:0.00}%";
+        varianceRow["Budgeted"] = DBNull.Value;
+        varianceRow["Actual"] = DBNull.Value;
+        varianceRow["Difference"] = DBNull.Value;
+        finalTable.Rows.Add(varianceRow);
+
+        // Add CATEGORIES ratio row
+        DataRow categoriesRow = finalTable.NewRow();
+        categoriesRow["Category"] = $"CATEGORIES: {categoriesUnderBudget}/{totalCategories} under";
+        categoriesRow["Budgeted"] = DBNull.Value;
+        categoriesRow["Actual"] = DBNull.Value;
+        categoriesRow["Difference"] = DBNull.Value;
+        finalTable.Rows.Add(categoriesRow);
+
         // Format and print the final table
         finalTable.SetTitleTextAlignment(TextAlignment.Left);
+        finalTable.Columns["Budgeted"].SetDataAlignment(TextAlignment.Right);
         finalTable.Columns["Actual"].SetDataAlignment(TextAlignment.Right);
         finalTable.Columns["Difference"].SetDataAlignment(TextAlignment.Right);
 
