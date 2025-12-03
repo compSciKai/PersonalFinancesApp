@@ -606,6 +606,41 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         return input == "x"; // Returns true (IsTrackedOnly) if user types 'x'
     }
 
+    public TransactionFilterService.TransactionRange PromptForTransactionRange()
+    {
+        while (true)
+        {
+            ShowMessage("\nSelect transaction date range:\n");
+
+            var ranges = Enum.GetValues(typeof(TransactionFilterService.TransactionRange))
+                .Cast<TransactionFilterService.TransactionRange>()
+                .ToList();
+
+            for (int i = 0; i < ranges.Count; i++)
+            {
+                string description = TransactionFilterService.GetHumanReadableTransactionRange(ranges[i]);
+                string defaultMarker = ranges[i] == TransactionFilterService.TransactionRange.CurrentMonth ? " (default)" : "";
+                ShowMessage($"{i + 1}. {description}{defaultMarker}");
+            }
+
+            ShowMessage("Enter = Current Month (default)\n");
+            var input = GetInput().Trim();
+
+            // Default to CurrentMonth if user presses Enter
+            if (string.IsNullOrEmpty(input))
+            {
+                return TransactionFilterService.TransactionRange.CurrentMonth;
+            }
+
+            if (int.TryParse(input, out int choice) && choice >= 1 && choice <= ranges.Count)
+            {
+                return ranges[choice - 1];
+            }
+
+            ShowMessage("Invalid input. Please enter a number between 1 and " + ranges.Count);
+        }
+    }
+
     private void DisplayTransactionDetails(Transaction transaction)
     {
         ShowMessage("\nTransaction Details:");

@@ -6,6 +6,8 @@ using PersonalFinances.Utilities;
 using Microsoft.Extensions.Configuration;
 
 
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
 // Transactions Paths
 //var transactionsDictionary = new Dictionary<string, Type>
 //{
@@ -206,4 +208,4 @@ var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     reprocessingService
 );
 
-await FinancesApp.RunAsync(transactionsDictionary, transactionRange);
+await FinancesApp.RunAsync(transactionsDictionary, null);

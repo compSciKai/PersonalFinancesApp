@@ -251,6 +251,15 @@ class PersonalFinancesApp
             userInput = "1";
         }
 
+        // Prompt for transaction range if user chose to continue to transactions
+        if (userInput == "1" || userInput == "")
+        {
+            transactionFilterString = _transactionUserInteraction.PromptForTransactionRange();
+
+            string selectedRangeDisplay = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
+            _transactionUserInteraction.ShowMessage($"\nTransaction range set to: {selectedRangeDisplay}\n");
+        }
+
         if (userInput == "2")
         {
             // Edit loop

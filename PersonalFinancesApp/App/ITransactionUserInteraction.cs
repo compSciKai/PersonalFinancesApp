@@ -14,4 +14,5 @@ public interface ITransactionsUserInteraction
     double PromptForBudgetAmount(string categoryName, double remainingBudget);
     (TransactionType type, bool applyToAll) PromptForTransactionType(string context);
     bool PromptForIsTrackedOnly(string categoryName);
+    TransactionFilterService.TransactionRange PromptForTransactionRange();
 }
