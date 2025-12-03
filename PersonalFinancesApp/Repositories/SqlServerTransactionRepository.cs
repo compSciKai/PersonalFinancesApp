@@ -81,6 +81,39 @@ public class SqlServerTransactionRepository<T> : ITransactionRepository<T> where
         return newTransactions.Count;
     }
 
+    public async Task<int> UpdateAsync(List<T> transactions)
+    {
+        if (!transactions.Any())
+            return 0;
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                foreach (var trans in transactions)
+                {
+                    // Update UpdatedDate timestamp
+                    trans.UpdatedDate = DateTime.UtcNow;
+
+                    // Mark entity as modified
+                    _context.Set<T>().Update(trans);
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
+
+        return transactions.Count;
+    }
+
     public async Task<bool> ExistsAsync(string transactionHash)
     {
         return await _context.Set<T>()

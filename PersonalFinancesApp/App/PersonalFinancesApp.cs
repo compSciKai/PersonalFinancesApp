@@ -16,6 +16,9 @@ class PersonalFinancesApp
     private readonly IVendorsService _vendorsService;
     private readonly ICategoriesService _categoriesService;
     private readonly IBudgetService _budgetService;
+    private readonly ITransferManagementService _transferManagementService;
+    private readonly ITransactionReprocessingService _reprocessingService;
+    private Dictionary<string, bool> _categoryTrackedOnlyCache = new();
 
     public PersonalFinancesApp(
         IFileTransactionRepository<RBCTransaction> rbcCsvRepository,
@@ -27,7 +30,9 @@ class PersonalFinancesApp
         ITransactionsUserInteraction transactionUserInteraction,
         IVendorsService vendorsService,
         ICategoriesService categoriesService,
-        IBudgetService budgetService
+        IBudgetService budgetService,
+        ITransferManagementService transferManagementService,
+        ITransactionReprocessingService reprocessingService
         )
     {
         _rbcCsvRepository = rbcCsvRepository;
@@ -40,6 +45,8 @@ class PersonalFinancesApp
         _vendorsService = vendorsService;
         _categoriesService = categoriesService;
         _budgetService = budgetService;
+        _transferManagementService = transferManagementService;
+        _reprocessingService = reprocessingService;
     }
 
     private async Task<string?> LoadLastUsedProfileAsync()
@@ -80,10 +87,47 @@ class PersonalFinancesApp
         }
     }
 
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            // Try to get the database repository
+            var categoriesService = _categoriesService as CategoriesService;
+            if (categoriesService != null)
+            {
+                // Access the internal repository (assuming it's DatabaseCategoriesRepository)
+                var dbRepoField = categoriesService.GetType().GetField("_categoriesRepository",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                if (dbRepoField != null)
+                {
+                    var dbRepo = dbRepoField.GetValue(categoriesService) as DatabaseCategoriesRepository;
+                    if (dbRepo != null)
+                    {
+                        var categories = await dbRepo.GetAllCategoriesAsync();
+                        _categoryTrackedOnlyCache = categories.ToDictionary(
+                            c => c.CategoryName,
+                            c => c.IsTrackedOnly,
+                            StringComparer.OrdinalIgnoreCase
+                        );
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _transactionUserInteraction.ShowMessage($"Warning: Could not load category cache: {ex.Message}");
+        }
+    }
+
     public async Task RunAsync(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString)
     {
         // load data from sources
-        Console.WriteLine("Finances App Initialized\n");
+        Console.WriteLine("CashFlow App Initialized\n");
+
+        // Load category cache for tracked-only detection
+        await LoadCategoriesAsync();
+
         List<string> categories = _categoriesService.GetAllCategories();
 
         BudgetProfile? profile = null;
@@ -195,12 +239,13 @@ class PersonalFinancesApp
         _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
         _transactionUserInteraction.ShowMessage("2. Edit profile");
         _transactionUserInteraction.ShowMessage("3. Category cleanup");
-        _transactionUserInteraction.ShowMessage("4. Quit\n");
+        _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+        _transactionUserInteraction.ShowMessage("5. Quit\n");
 
         string userInput = _transactionUserInteraction.GetInput().Trim();
 
         // Input validation
-        if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+        if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
         {
             _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
             userInput = "1";
@@ -232,18 +277,19 @@ class PersonalFinancesApp
                     _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
                     _transactionUserInteraction.ShowMessage("2. Edit profile");
                     _transactionUserInteraction.ShowMessage("3. Category cleanup");
-                    _transactionUserInteraction.ShowMessage("4. Quit\n");
+                    _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+                    _transactionUserInteraction.ShowMessage("5. Quit\n");
 
                     userInput = _transactionUserInteraction.GetInput().Trim();
 
                     // Input validation
-                    if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+                    if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
                     {
                         _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
                         userInput = "1";
                     }
 
-                    if (userInput != "2" && userInput != "3")
+                    if (userInput != "2" && userInput != "3" && userInput != "4")
                     {
                         continueEditing = false;
                     }
@@ -265,18 +311,19 @@ class PersonalFinancesApp
             _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
             _transactionUserInteraction.ShowMessage("2. Edit profile");
             _transactionUserInteraction.ShowMessage("3. Category cleanup");
-            _transactionUserInteraction.ShowMessage("4. Quit\n");
+            _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+            _transactionUserInteraction.ShowMessage("5. Quit\n");
 
             userInput = _transactionUserInteraction.GetInput().Trim();
 
             // Input validation
-            if (!new[] { "1", "2", "3", "4", "" }.Contains(userInput))
+            if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
             {
                 _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
                 userInput = "1";
             }
 
-            if (userInput == "4")
+            if (userInput == "5")
             {
                 _transactionUserInteraction.Exit();
             }
@@ -284,97 +331,298 @@ class PersonalFinancesApp
 
         if (userInput == "4")
         {
+            // Reprocess untyped transactions within the configured date range for current user
+            var transactionsToReprocess = await _reprocessingService.GetUnprocessedTransactionsAsync(transactionFilterString, profile.UserName);
+
+            if (transactionsToReprocess.Any())
+            {
+                _transactionUserInteraction.ShowMessage($"\nFound {transactionsToReprocess.Count} unprocessed transaction(s) with Type=0 in date range '{TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString)}'.");
+                _transactionUserInteraction.ShowMessage("Reprocess these transactions? (y/n): ");
+                var response = _transactionUserInteraction.GetInput().Trim().ToLower();
+
+                if (response == "y")
+                {
+                    await _reprocessingService.ReprocessTransactionsAsync(transactionsToReprocess, profile);
+                }
+                else
+                {
+                    _transactionUserInteraction.ShowMessage("Reprocessing cancelled.\n");
+                }
+            }
+            else
+            {
+                _transactionUserInteraction.ShowMessage($"\nNo unprocessed transactions found in date range '{TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString)}' (all transactions have Type assigned).\n");
+            }
+
+            // After reprocessing, show menu again
+            _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+            _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
+            _transactionUserInteraction.ShowMessage("2. Edit profile");
+            _transactionUserInteraction.ShowMessage("3. Category cleanup");
+            _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+            _transactionUserInteraction.ShowMessage("5. Quit\n");
+
+            userInput = _transactionUserInteraction.GetInput().Trim();
+
+            // Input validation
+            if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
+            {
+                _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
+                userInput = "1";
+            }
+
+            if (userInput == "5")
+            {
+                _transactionUserInteraction.Exit();
+            }
+        }
+
+        if (userInput == "5")
+        {
             _transactionUserInteraction.Exit();
         }
 
         // Get new transactions from CSV repository
-        foreach (var transactionEntry in transactionsDictionary)
+        Console.WriteLine("\n🔄 Loading transactions from CSV files...");
+        if (transactionsDictionary != null)
         {
-            if (string.IsNullOrEmpty(transactionEntry.Key))
+            foreach (var transactionEntry in transactionsDictionary)
             {
-                continue; // Skip empty keys
-            }
-            else if (transactionEntry.Value == typeof(RBCTransaction))
-            {
-                var transactions = await _rbcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                await _rbcSqlRepository.SaveAsync(transactions);
-            }
-            else if (transactionEntry.Value == typeof(AmexTransaction))
-            {
-                var transactions = await _amexCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                await _amexSqlRepository.SaveAsync(transactions);
-            }
-            else if (transactionEntry.Value == typeof(PCFinancialTransaction))
-            {
-                var transactions = await _pcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                await _pcSqlRepository.SaveAsync(transactions);
-            }
-            else
-            {
-                throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
+                if (string.IsNullOrEmpty(transactionEntry.Key))
+                {
+                    continue; // Skip empty keys
+                }
+                else if (transactionEntry.Value == typeof(RBCTransaction))
+                {
+                    var transactions = await _rbcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                    await _rbcSqlRepository.SaveAsync(transactions);
+                }
+                else if (transactionEntry.Value == typeof(AmexTransaction))
+                {
+                    var transactions = await _amexCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                    await _amexSqlRepository.SaveAsync(transactions);
+                }
+                else if (transactionEntry.Value == typeof(PCFinancialTransaction))
+                {
+                    var transactions = await _pcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                    await _pcSqlRepository.SaveAsync(transactions);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
+                }
             }
         }
 
         // fetch all transactions
+        Console.WriteLine("🔄 Fetching transactions from database...");
         var rbcTransactions = await _rbcSqlRepository.GetAllAsync();
         var amexTransactions = await _amexSqlRepository.GetAllAsync();
         var pcTransactions = await _pcSqlRepository.GetAllAsync();
-        
+        Console.WriteLine($"✓ Loaded {rbcTransactions.Count + amexTransactions.Count + pcTransactions.Count} transactions from database\n");
+
         var allTransactions = new List<Transaction>();
         allTransactions.AddRange(rbcTransactions);
         allTransactions.AddRange(amexTransactions);
         allTransactions.AddRange(pcTransactions);
 
-        // process transactions if missing fields
+        // Filter by date range BEFORE prompting user for vendor/category
+        List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(allTransactions, transactionFilterString);
 
-        // construct list of transactions and handler dictionary, iterate over
-        List<Transaction> transactionsWithVendors = _vendorsService.AddVendorsToTransactions(allTransactions);
-        List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors, profile, _budgetService);
-        List<Transaction> filteredTransactions = TransactionFilterService.GetTransactionsInRange(transactionsWithCategories, transactionFilterString);
-
+        // Filter by user BEFORE prompting (if applicable)
         if (profile.UserName != null)
         {
             filteredTransactions = TransactionFilterService.GetTransactionsForUser(filteredTransactions, profile.UserName);
         }
 
-        filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
+        // Now process only the filtered transactions - user only sees prompts for relevant date range
+        Console.WriteLine($"🔄 Processing {filteredTransactions.Count} transactions in selected range...\n");
+        List<Transaction> transactionsWithVendors = await _vendorsService.AddVendorsToTransactionsAsync(filteredTransactions);
+        List<Transaction> transactionsWithCategories = await _categoriesService.AddCategoriesToTransactionsAsync(transactionsWithVendors, profile, _budgetService);
 
-        List<Transaction> spendingTransactions = TransactionFilterService.GetSpendingTransactions(filteredTransactions);
+        // Persist Transaction.Type and other changes to database
+        var rbcToUpdate = transactionsWithCategories.OfType<RBCTransaction>().ToList();
+        var amexToUpdate = transactionsWithCategories.OfType<AmexTransaction>().ToList();
+        var pcToUpdate = transactionsWithCategories.OfType<PCFinancialTransaction>().ToList();
+
+        if (rbcToUpdate.Any())
+            await _rbcSqlRepository.UpdateAsync(rbcToUpdate);
+        if (amexToUpdate.Any())
+            await _amexSqlRepository.UpdateAsync(amexToUpdate);
+        if (pcToUpdate.Any())
+            await _pcSqlRepository.UpdateAsync(pcToUpdate);
+
+        // Update filteredTransactions to point to the categorized subset
+        filteredTransactions = transactionsWithCategories;
+
+        // Transfer Management Phase
+        var transferCount = filteredTransactions.Count(t => t.Type == TransactionType.Transfer);
+        if (transferCount > 0)
+        {
+            Console.Write($"\nFound {transferCount} transfer(s). Review transfers? (y/n): ");
+            var reviewTransfers = Console.ReadLine()?.Trim().ToLower();
+
+            if (reviewTransfers == "y")
+            {
+                try
+                {
+                    await _transferManagementService.ManageTransfersAsync(filteredTransactions, profile);
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("Transfer management cancelled.\n");
+                }
+            }
+        }
+
+        // filteredTransactions = _categoriesService.OverrideCategories(filteredTransactions, "Restaurant", "Entertainment");
 
         string rangeType = TransactionFilterService.GetHumanReadableTransactionRange(transactionFilterString);
         string tableName = rangeType is not null ? $"{rangeType} Transactions" : "Transactions";
 
+        // Get type-based transaction lists
+        var budgetedExpenses = GetBudgetedExpenses(filteredTransactions);
+        var trackedOnlyExpenses = GetTrackedOnlyExpenses(filteredTransactions);
+        var transfers = GetTransfers(filteredTransactions);
+        var income = GetIncome(filteredTransactions);
+        var adjustments = GetAdjustments(filteredTransactions);
+        var unbudgetedExpenses = GetUnbudgetedExpenses(filteredTransactions, profile);
 
-        // output information 
-        _transactionUserInteraction.OutputTransactions(spendingTransactions, tableName, null);
+        // Output all transactions overview
+        _transactionUserInteraction.OutputTransactions(filteredTransactions, tableName, null);
+
+        // === SECTION 1: BUDGET CATEGORIES ===
+        Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+        Console.WriteLine("                    BUDGET CATEGORIES");
+        Console.WriteLine("═══════════════════════════════════════════════════════════\n");
 
         foreach (string category in categories)
         {
-            List<Transaction> categorizedTransactions = filteredTransactions.Where(transaction => transaction.Category == category).ToList();
+            var categorizedTransactions = budgetedExpenses
+                .Where(transaction => string.Equals(transaction.Category, category, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(transaction => transaction.Date)
+                .ToList();
 
-            if (profile.BudgetCategories.Any(c => c.Key.ToLower() == category.ToLower()))
+            if (profile.BudgetCategories.Any(c => c.Key.ToLower() == category.ToLower()) && categorizedTransactions.Any())
             {
                 _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
             }
         }
 
-        // Output uncategorized transactions section
-        List<Transaction> uncategorizedTransactions = filteredTransactions
-            .Where(t => string.IsNullOrEmpty(t.Category))
-            .ToList();
+        // Output Budget Vs Actual for budgeted categories only
 
-        if (uncategorizedTransactions.Any())
+        _transactionUserInteraction.OutputBudgetVsActual(budgetedExpenses, profile);
+
+        // === SECTION 1.5: UNBUDGETED CATEGORIES ===
+        DisplayUnbudgetedCategories(unbudgetedExpenses);
+
+        // === SECTION 2: FIXED OBLIGATIONS (Tracked Only) ===
+        if (trackedOnlyExpenses.Any())
         {
-            _transactionUserInteraction.OutputTransactions(uncategorizedTransactions, "Uncategorized", null);
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("              FIXED OBLIGATIONS (Tracked Only)");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            var trackedCategories = trackedOnlyExpenses
+                .Where(t => !string.IsNullOrEmpty(t.Category))
+                .Select(t => t.Category)
+                .Distinct()
+                .ToList();
+
+            foreach (var category in trackedCategories)
+            {
+                var trackedTransactions = trackedOnlyExpenses
+                    .Where(t => string.Equals(t.Category, category, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(t => t.Date)
+                    .ToList();
+
+                _transactionUserInteraction.OutputTransactions(trackedTransactions, $"{category} (Tracked)", null);
+            }
+
+            var totalTrackedOnly = trackedOnlyExpenses.Sum(t => t.Amount);
+            Console.WriteLine($"\nTotal Fixed Obligations: ${Math.Abs(totalTrackedOnly):N2}\n");
         }
 
-        // Output Budget Vs Actual Spending Totals
-        _transactionUserInteraction.OutputBudgetVsActual(filteredTransactions, profile);
+        // === SECTION 3: ACCOUNT ACTIVITY (Transfers) ===
+        if (transfers.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                   ACCOUNT ACTIVITY");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            DisplayTransfers(transfers);
+        }
+
+        // === SECTION 4: INCOME ===
+        if (income.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                        INCOME");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            _transactionUserInteraction.OutputTransactions(income, "Income", null);
+            Console.WriteLine($"\nTotal Income: ${Math.Abs(income.Sum(t => t.Amount)):N2}\n");
+        }
+
+        // === SECTION 5: UNCATEGORIZED ADJUSTMENTS ===
+        if (adjustments.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("              UNCATEGORIZED ADJUSTMENTS");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            _transactionUserInteraction.OutputTransactions(adjustments, "Uncategorized Adjustments", null);
+            Console.WriteLine($"\nTotal Uncategorized Adjustments: ${adjustments.Sum(t => t.Amount):N2}\n");
+        }
+
+        // === UNCATEGORIZED TRANSACTIONS ===
+        var uncategorizedExpenses = filteredTransactions
+            .Where(t => t.Type == TransactionType.Expense && string.IsNullOrEmpty(t.Category))
+            .OrderBy(t => t.Date)
+            .ToList();
+
+        if (uncategorizedExpenses.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                   UNCATEGORIZED EXPENSES");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            _transactionUserInteraction.OutputTransactions(uncategorizedExpenses, "Uncategorized", null);
+        }
+
+        // === UNPROCESSED TRANSACTIONS ===
+        var unprocessedTransactions = filteredTransactions
+            .Where(t => t.Type == 0 || t.Type == default(TransactionType))
+            .OrderBy(t => t.Date)
+            .ToList();
+
+        // === TRANSACTION RECONCILIATION VALIDATION ===
+        // Ensure every transaction is accounted for in exactly one group
+        var totalInGroups = budgetedExpenses.Count + trackedOnlyExpenses.Count +
+                           transfers.Count + income.Count + adjustments.Count +
+                           uncategorizedExpenses.Count + unprocessedTransactions.Count;
+
+        if (totalInGroups != filteredTransactions.Count)
+        {
+            Console.WriteLine($"\n⚠️  WARNING: Transaction count mismatch!");
+            Console.WriteLine($"   Total transactions: {filteredTransactions.Count}");
+            Console.WriteLine($"   Accounted for: {totalInGroups}");
+            Console.WriteLine($"   Difference: {filteredTransactions.Count - totalInGroups}");
+            Console.WriteLine("   Some transactions may be missing or double-counted!\n");
+        }
+
+        if (unprocessedTransactions.Any())
+        {
+            Console.WriteLine("\n═══════════════════════════════════════════════════════════");
+            Console.WriteLine("                ⚠ UNPROCESSED TRANSACTIONS");
+            Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+            _transactionUserInteraction.OutputTransactions(unprocessedTransactions, "Unprocessed", null);
+            Console.WriteLine($"\n⚠ {unprocessedTransactions.Count} transaction(s) need type classification.\n");
+        }
 
 
         /* TODO:
-        - [ ] Fix transfers
-        - [ ] Fix Create table for other transactions
         - [ ] create method to find specific trnansactions via name and amount to categorize as, rent, student loan, etc -- take one
         - [ ] create total expense vs diff
         - [ ] aim to get caluclates to become exact
@@ -382,6 +630,233 @@ class PersonalFinancesApp
 
         */
         //_transactionCsvRepository.ExportTransactions(filteredTransactions, "./export-test.csv");
+    }
 
+    /// <summary>
+    /// Get expenses that are budgeted (not tracked-only), including categorized adjustments
+    /// </summary>
+    private List<Transaction> GetBudgetedExpenses(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t =>
+                (t.Type == TransactionType.Expense || t.Type == TransactionType.Adjustment) &&
+                !string.IsNullOrEmpty(t.Category) &&  // Exclude uncategorized (handled separately)
+                !IsCategoryTrackedOnly(t.Category))   // Exclude tracked-only expenses
+            .OrderBy(t => t.Date)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get expenses that are tracked-only (not budgeted), including categorized adjustments
+    /// </summary>
+    private List<Transaction> GetTrackedOnlyExpenses(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => (t.Type == TransactionType.Expense || t.Type == TransactionType.Adjustment) &&
+                        IsCategoryTrackedOnly(t.Category))
+            .OrderBy(t => t.Date)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get all transfers
+    /// </summary>
+    private List<Transaction> GetTransfers(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => t.Type == TransactionType.Transfer)
+            .OrderBy(t => t.Date)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get all income transactions
+    /// </summary>
+    private List<Transaction> GetIncome(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => t.Type == TransactionType.Income)
+            .OrderBy(t => t.Date)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get uncategorized adjustments only (categorized adjustments are grouped with their categories)
+    /// </summary>
+    private List<Transaction> GetAdjustments(List<Transaction> transactions)
+    {
+        return transactions
+            .Where(t => t.Type == TransactionType.Adjustment && string.IsNullOrEmpty(t.Category))
+            .OrderBy(t => t.Date)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get expense transactions with categories NOT in the budget profile
+    /// </summary>
+    private List<Transaction> GetUnbudgetedExpenses(List<Transaction> transactions, BudgetProfile? profile)
+    {
+        // If no budget profile, consider all categorized expenses as budgeted
+        // (fallback to existing behavior - don't show as unbudgeted)
+        if (profile == null || !profile.BudgetCategories.Any())
+            return new List<Transaction>();
+
+        // Create case-insensitive set of budget category names
+        var budgetCategoryNames = new HashSet<string>(
+            profile.BudgetCategories.Keys,
+            StringComparer.OrdinalIgnoreCase);
+
+        return transactions
+            .Where(t =>
+                t.Type == TransactionType.Expense &&
+                !string.IsNullOrEmpty(t.Category) &&
+                !budgetCategoryNames.Contains(t.Category) &&
+                !IsCategoryTrackedOnly(t.Category))
+            .OrderBy(t => t.Date)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Check if a category is marked as tracked-only
+    /// </summary>
+    private bool IsCategoryTrackedOnly(string? categoryName)
+    {
+        if (string.IsNullOrEmpty(categoryName))
+            return false;
+
+        // Use the cache loaded during initialization
+        return _categoryTrackedOnlyCache.TryGetValue(categoryName, out bool isTrackedOnly)
+            ? isTrackedOnly
+            : false;
+    }
+
+    /// <summary>
+    /// Display transfers with special formatting showing matched pairs
+    /// </summary>
+    private void DisplayTransfers(List<Transaction> transfers)
+    {
+        var displayedIds = new HashSet<int>();
+
+        foreach (var transfer in transfers)
+        {
+            if (displayedIds.Contains(transfer.Id))
+                continue;
+
+            // Check if this is part of a reconciled pair
+            if (transfer.IsReconciledTransfer && !string.IsNullOrEmpty(transfer.LinkedTransactionId))
+            {
+                // Find the matching transfer
+                var linkedTransfer = transfers.FirstOrDefault(t =>
+                    t.LinkedTransactionId == transfer.LinkedTransactionId &&
+                    t.Id != transfer.Id);
+
+                if (linkedTransfer != null)
+                {
+                    // Display as a matched pair with correct directions for each transaction
+                    var direction1 = GetTransferDirection(transfer);
+                    var direction2 = GetTransferDirection(linkedTransfer);
+
+                    var account1 = GetFormattedAccountInfo(transfer);
+                    var account2 = GetFormattedAccountInfo(linkedTransfer);
+
+                    Console.WriteLine($"{transfer.Date:MMM dd}  {account1,-20} {transfer.Description,-40} ${Math.Abs(transfer.Amount),10:N2} {direction1} ↔");
+                    Console.WriteLine($"{linkedTransfer.Date:MMM dd}  {account2,-20} {linkedTransfer.Description,-40} ${Math.Abs(linkedTransfer.Amount),10:N2} {direction2}  ✓ Reconciled\n");
+
+                    displayedIds.Add(transfer.Id);
+                    displayedIds.Add(linkedTransfer.Id);
+                    continue;
+                }
+            }
+
+            // Display as unmatched transfer
+            var account = GetFormattedAccountInfo(transfer);
+            var direction = GetTransferDirection(transfer);
+            Console.WriteLine($"{transfer.Date:MMM dd}  {account,-20} {transfer.Description,-40} ${Math.Abs(transfer.Amount),10:N2} {direction}  ⚠ Unmatched");
+
+            displayedIds.Add(transfer.Id);
+        }
+
+        var totalTransfers = transfers.Sum(t => t.Amount);
+        Console.WriteLine($"\nNet Transfer Activity: ${totalTransfers:N2}");
+        Console.WriteLine($"(↑ = money out, ↓ = money in)\n");
+    }
+
+    /// <summary>
+    /// Format account information with account number (last 4 digits) if available
+    /// </summary>
+    private string GetFormattedAccountInfo(Transaction transaction)
+    {
+        if (transaction is AmexTransaction amex && !string.IsNullOrEmpty(amex.AccountNumber))
+        {
+            // Get last 4 digits of account number
+            var last4 = amex.AccountNumber.Length > 4
+                ? amex.AccountNumber.Substring(amex.AccountNumber.Length - 4)
+                : amex.AccountNumber;
+            return $"{transaction.AccountType} (*{last4})";
+        }
+
+        return transaction.AccountType;
+    }
+
+    /// <summary>
+    /// Get transfer direction (IN/OUT) respecting bank-specific amount conventions
+    /// </summary>
+    private string GetTransferDirection(Transaction transaction)
+    {
+        if (transaction.isNegativeAmounts)
+        {
+            // RBC, PC Financial: negative amounts = money out, positive = money in
+            return transaction.Amount < 0 ? "↑ OUT" : "↓ IN ";
+        }
+        else
+        {
+            // Amex: positive amounts = money out, negative = money in
+            return transaction.Amount > 0 ? "↑ OUT" : "↓ IN ";
+        }
+    }
+
+    /// <summary>
+    /// Display unbudgeted categories section
+    /// </summary>
+    private void DisplayUnbudgetedCategories(List<Transaction> unbudgetedExpenses)
+    {
+        if (!unbudgetedExpenses.Any())
+            return;
+
+        // Group by category
+        var categoryGroups = unbudgetedExpenses
+            .GroupBy(t => t.Category)
+            .OrderBy(g => g.Key);
+
+        // Calculate summary stats
+        int categoryCount = categoryGroups.Count();
+        int transactionCount = unbudgetedExpenses.Count;
+        decimal totalAmount = unbudgetedExpenses.Sum(t => Math.Abs(t.Amount));
+
+        // Display summary
+        Console.WriteLine($"\nFound {categoryCount} unbudgeted {(categoryCount == 1 ? "category" : "categories")} " +
+                         $"({transactionCount} {(transactionCount == 1 ? "transaction" : "transactions")}, " +
+                         $"${totalAmount:N2} total)\n");
+
+        Console.WriteLine("═══════════════════════════════════════════════════════════");
+        Console.WriteLine("                 UNBUDGETED CATEGORIES");
+        Console.WriteLine("═══════════════════════════════════════════════════════════\n");
+
+        // Display each category
+        foreach (var group in categoryGroups)
+        {
+            string categoryName = group.Key ?? "Unknown";
+            var categoryTransactions = group.OrderBy(t => t.Date).ToList();
+
+            // Display transactions for this category (table header already includes category name)
+            _transactionUserInteraction.OutputTransactions(categoryTransactions, categoryName, null);
+
+            // Calculate subtotal for this category
+            decimal subtotal = categoryTransactions.Sum(t => Math.Abs(t.Amount));
+            Console.WriteLine($"  Subtotal: ${subtotal:N2}\n");
+        }
+
+        // Display total
+        Console.WriteLine($"Total Unbudgeted Spending: ${totalAmount:N2}\n");
     }
 }

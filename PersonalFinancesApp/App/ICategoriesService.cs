@@ -6,7 +6,7 @@ public interface ICategoriesService
 {
     string GetCategory(string vendor);
     List<string> GetAllCategories();
-    Task StoreNewCategoryAsync(string key, string categoryName);
+    Task StoreNewCategoryAsync(string vendorName, string categoryName, TransactionType? suggestedType = null, bool overrideType = false, bool isTrackedOnly = false);
     void StoreNewCategories(Dictionary<string, string> categoryDictionary);
     Task<List<Transaction>> AddCategoriesToTransactionsAsync(List<Transaction> transactions, BudgetProfile? profile, IBudgetService? budgetService);
     List<Transaction> OverrideCategories(List<Transaction> transactions, string categoryToOverride, string newCategory);

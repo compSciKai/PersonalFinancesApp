@@ -490,10 +490,12 @@ public class BudgetService : IBudgetService
                 {
                     // Validate against remaining budget
                     double currentTotal = workingProfile.Categories.Sum(c => c.BudgetAmount);
-                    double remainingBudget = workingProfile.Income - currentTotal;
 
-                    if (amount > remainingBudget)
+                    // Use epsilon tolerance (1 cent) to handle floating-point precision errors
+                    const double epsilon = 0.01;
+                    if (currentTotal + amount > workingProfile.Income + epsilon)
                     {
+                        double remainingBudget = workingProfile.Income - currentTotal;
                         _transactionUserInteraction.ShowMessage($"Cannot add category. Amount ${amount:0.00} exceeds remaining budget of ${remainingBudget:0.00}.\n");
                         continue;
                     }
@@ -562,7 +564,9 @@ public class BudgetService : IBudgetService
                                 .Where(c => c != categoryToEdit)
                                 .Sum(c => c.BudgetAmount);
 
-                            if (totalWithoutThisCategory + newAmount > workingProfile.Income)
+                            // Use epsilon tolerance (1 cent) to handle floating-point precision errors
+                            const double epsilon = 0.01;
+                            if (totalWithoutThisCategory + newAmount > workingProfile.Income + epsilon)
                             {
                                 double maxAllowed = workingProfile.Income - totalWithoutThisCategory;
                                 _transactionUserInteraction.ShowMessage($"Cannot update amount. New total would exceed income. Maximum allowed: ${maxAllowed:0.00}\n");

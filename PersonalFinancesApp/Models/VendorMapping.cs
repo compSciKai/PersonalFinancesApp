@@ -12,6 +12,10 @@ public class Category : BaseEntity
     [StringLength(500)]
     public string? Description { get; set; }
 
+    // When true, transactions in this category are tracked but don't count against budget
+    // Examples: mortgage, credit card payments, account transfers
+    public bool IsTrackedOnly { get; set; } = false;
+
     // Navigation property
     public virtual ICollection<VendorMapping> Vendors { get; set; } = new List<VendorMapping>();
 }
@@ -32,4 +36,11 @@ public class VendorMapping : BaseEntity
     // Navigation property
     [JsonIgnore]
     public virtual Category? Category { get; set; }
+
+    // Transaction type hint for auto-detection
+    public TransactionType? SuggestedType { get; set; }
+
+    // When true, all transactions matching this vendor will be forced to SuggestedType
+    // When false, SuggestedType is just a hint and can be overridden by detection rules
+    public bool OverrideType { get; set; } = false;
 }

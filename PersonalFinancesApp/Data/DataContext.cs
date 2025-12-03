@@ -1,10 +1,15 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using PersonalFinances.Models;
+using Npgsql;
+using Microsoft.Extensions.Configuration;
+using PersonalFinances.Utilities;
 
 namespace PersonalFinances.Data;
 
 public class  TransactionContext : DbContext
 {
+    private static string? _connectionString;
+
     public DbSet<RBCTransaction> RBCTransactions { get; set; }
     public DbSet<AmexTransaction> AmexTransactions { get; set; }
     public DbSet<PCFinancialTransaction> PCTransactions { get; set; }
@@ -13,16 +18,37 @@ public class  TransactionContext : DbContext
     public DbSet<VendorMapping> VendorMappings { get; set; }
     public DbSet<Category> Categories { get; set; }
 
+    /// <summary>
+    /// Initializes the connection string from configuration.
+    /// Must be called before creating any TransactionContext instances.
+    /// </summary>
+    public static void Initialize(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetConnectionString("DefaultConnection");
+
+        if (string.IsNullOrEmpty(_connectionString))
+        {
+            throw new InvalidOperationException(
+                "Connection string 'DefaultConnection' not found in appsettings.json. " +
+                "Please ensure appsettings.json exists and contains a valid connection string.");
+        }
+    }
+
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
         if (!options.IsConfigured)
         {
+            if (string.IsNullOrEmpty(_connectionString))
+            {
+                throw new InvalidOperationException(
+                    "TransactionContext has not been initialized. " +
+                    "Call TransactionContext.Initialize(configuration) before creating instances.");
+            }
+
             // Enable legacy timestamp behavior to allow DateTime with Kind=Unspecified
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
-            options.UseNpgsql(
-                @"Host=aws-1-ca-central-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.vfzsxkzjubfrgcnbifpt;Password=uRI6FH23O5c8JYEt;SslMode=Require;",
-                o => o.EnableRetryOnFailure());
+            options.UseNpgsql(_connectionString, o => o.EnableRetryOnFailure());
         }
     }
 
@@ -109,5 +135,98 @@ public class  TransactionContext : DbContext
                   .IsUnique()
                   .HasDatabaseName("IX_Category_CategoryName");
         });
+    }
+
+    /// <summary>
+    /// Validates that the database connection is working and provides user-friendly error messages.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when connection fails with details about the issue.</exception>
+    public async Task ValidateDatabaseConnectionAsync()
+    {
+        try
+        {
+            // Actually execute a query to verify authentication works
+            // CanConnectAsync() doesn't fully authenticate, so we need to run a real query
+            await Database.ExecuteSqlRawAsync("SELECT 1");
+        }
+        catch (PostgresException ex) when (ex.SqlState == "28P01" || ex.Message.Contains("password authentication failed"))
+        {
+            throw new InvalidOperationException(
+                "\n╔═══════════════════════════════════════════════════════════════════════╗\n" +
+                "║                   AUTHENTICATION FAILED                               ║\n" +
+                "╠═══════════════════════════════════════════════════════════════════════╣\n" +
+                "║ The database password is incorrect or has been changed.               ║\n" +
+                "║                                                                       ║\n" +
+                "║ This usually happens when:                                            ║\n" +
+                "║   - You recently reset your Supabase password                         ║\n" +
+                "║   - The password in your configuration is wrong                       ║\n" +
+                "║                                                                       ║\n" +
+                "║ To fix this:                                                          ║\n" +
+                "║   1. Update the password in DataContext.cs line 25                    ║\n" +
+                "║                                                                       ║\n" +
+                "║ For better security (recommended):                                    ║\n" +
+                "║   See PASSWORD_UPDATE_GUIDE.md for instructions on using User Secrets ║\n" +
+                "╚═══════════════════════════════════════════════════════════════════════╝\n",
+                ex);
+        }
+        catch (PostgresException ex) when (ex.SqlState == "XX000" || ex.Message.Contains("Tenant or user not found"))
+        {
+            throw new InvalidOperationException(
+                "\n╔═══════════════════════════════════════════════════════════════════════╗\n" +
+                "║                    DATABASE CONNECTION FAILED                         ║\n" +
+                "╠═══════════════════════════════════════════════════════════════════════╣\n" +
+                "║ Your Supabase project appears to be paused.                           ║\n" +
+                "║                                                                       ║\n" +
+                "║ Free tier Supabase projects pause after 7 days of inactivity.         ║\n" +
+                "║                                                                       ║\n" +
+                "║ To fix this:                                                          ║\n" +
+                "║   1. Go to https://supabase.com/dashboard                             ║\n" +
+                "║   2. Select your project                                              ║\n" +
+                "║   3. Click 'Restore project' or 'Unpause'                             ║\n" +
+                "║   4. Wait a few moments for the database to become active             ║\n" +
+                "║   5. Run this application again                                       ║\n" +
+                "╚═══════════════════════════════════════════════════════════════════════╝\n",
+                ex);
+        }
+        catch (NpgsqlException ex) when (ex.Message.Contains("password authentication failed"))
+        {
+            throw new InvalidOperationException(
+                "\n╔═══════════════════════════════════════════════════════════════════════╗\n" +
+                "║                   AUTHENTICATION FAILED                               ║\n" +
+                "╠═══════════════════════════════════════════════════════════════════════╣\n" +
+                "║ The database password is incorrect.                                   ║\n" +
+                "║                                                                       ║\n" +
+                "║ To fix this:                                                          ║\n" +
+                "║   Update the password in DataContext.cs line 25                       ║\n" +
+                "║                                                                       ║\n" +
+                "║ For better security:                                                  ║\n" +
+                "║   See PASSWORD_UPDATE_GUIDE.md for using User Secrets                 ║\n" +
+                "╚═══════════════════════════════════════════════════════════════════════╝\n",
+                ex);
+        }
+        catch (NpgsqlException ex)
+        {
+            throw new InvalidOperationException(
+                BoxFormatter.CreateErrorBox(
+                    "DATABASE CONNECTION FAILED",
+                    $"Error: {ex.Message}",
+                    "",
+                    "Possible causes:",
+                    "  - Supabase project is paused (check dashboard)",
+                    "  - Network connectivity issues",
+                    "  - Invalid credentials",
+                    "  - Database server is down"
+                ),
+                ex);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                BoxFormatter.CreateErrorBox(
+                    "DATABASE CONNECTION FAILED",
+                    $"Unexpected error: {ex.Message}"
+                ),
+                ex);
+        }
     }
 }

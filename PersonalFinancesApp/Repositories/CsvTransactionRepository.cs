@@ -25,17 +25,23 @@ public class CsvTransactionRepository<T> : IFileTransactionRepository<T> where T
         using (var reader = new StreamReader(filePath))
         using (var csv = new CsvReader(reader, config))
         {
-            // Read header to detect if this is an RBC CSV
+            // Read header to detect the CSV format
             await csv.ReadAsync();
             csv.ReadHeader();
             var headers = csv.HeaderRecord;
 
             // Check if it has RBC-style columns
             bool isRBCFormat = headers.Contains("Description 1") && headers.Contains("Description 2");
+            // Check if it has PC Financial-style columns
+            bool isPCFormat = headers.Contains("Type") && headers.Contains("Card Holder Name");
 
             if (typeof(T) == typeof(RBCTransaction) && isRBCFormat)
             {
                 csv.Context.RegisterClassMap<RBCTransactionMap>();
+            }
+            else if (typeof(T) == typeof(PCFinancialTransaction) && isPCFormat)
+            {
+                csv.Context.RegisterClassMap<PCFinancialTransactionMap>();
             }
 
             var transactions = new List<T>();
@@ -76,6 +82,11 @@ public class CsvTransactionRepository<T> : IFileTransactionRepository<T> where T
         throw new NotSupportedException("CSV repository requires a file path. Use SaveToFileAsync instead.");
     }
 
+    public async Task<int> UpdateAsync(List<T> transactions)
+    {
+        throw new NotSupportedException("CSV repository does not support updating transactions. Use SaveToFileAsync to overwrite the entire file.");
+    }
+
     public async Task<bool> ExistsAsync(string transactionHash)
     {
         throw new NotSupportedException("CSV repository cannot check existence without loading a file first.");
@@ -96,6 +107,20 @@ public class CsvTransactionRepository<T> : IFileTransactionRepository<T> where T
                 var desc2 = args.Row.GetField("Description 2") ?? "";
                 return $"{desc1} {desc2}".Trim();
             });
+        }
+    }
+
+    public class PCFinancialTransactionMap : ClassMap<PCFinancialTransaction>
+    {
+        public PCFinancialTransactionMap()
+        {
+            Map(m => m.Date).Name("Date");
+            Map(m => m.Description).Name("Description");
+            Map(m => m.Amount).Name("Amount");
+            Map(m => m.MemberName).Name("Card Holder Name");
+            Map(m => m.TransactionType).Name("Type"); // This is the string property
+            Map(m => m.AccountType).Ignore(); // Set in the class default
+            Map(m => m.Type).Ignore(); // Ignore the enum Type from base class during CSV reading
         }
     }
 }

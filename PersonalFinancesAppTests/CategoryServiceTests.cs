@@ -29,7 +29,8 @@ namespace PersonalFinancesAppTests
             };
 
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
+            var typeDetector = new TransactionTypeDetector();
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object, typeDetector);
 
             var result = _cut.GetCategory("Amazon");
 
@@ -46,7 +47,8 @@ namespace PersonalFinancesAppTests
             };
 
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
+            var typeDetector = new TransactionTypeDetector();
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object, typeDetector);
 
             var result = _cut.GetCategory("UnknownVendor");
 
@@ -64,7 +66,8 @@ namespace PersonalFinancesAppTests
             };
 
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
+            var typeDetector = new TransactionTypeDetector();
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object, typeDetector);
 
             var result = _cut.GetAllCategories();
 
@@ -75,7 +78,8 @@ namespace PersonalFinancesAppTests
         public void GetAllCategories_ReturnsEmptyCategories()
         {
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(new Dictionary<string, string>());
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
+            var typeDetector = new TransactionTypeDetector();
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object, typeDetector);
 
             var result = _cut.GetAllCategories();
             Assert.That(result, Is.Empty);
@@ -86,7 +90,8 @@ namespace PersonalFinancesAppTests
         {
             var categoriesMap = new Dictionary<string, string>();
             _categoriesRepositoryMock.Setup(repo => repo.LoadCategoriesMap()).Returns(categoriesMap);
-            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object);
+            var typeDetector = new TransactionTypeDetector();
+            _cut = new CategoriesService(_categoriesRepositoryMock.Object, null, _transactionUserInteractionMock.Object, typeDetector);
 
             await _cut.StoreNewCategoryAsync("netflix", "entertainment");
 
