@@ -18,3 +18,5 @@ budgetProfiles.json
 categories.json
 vendors.json
 /PersonalFinancesApp/Migrations
+build-logs/
+/.claude/settings.local.json
