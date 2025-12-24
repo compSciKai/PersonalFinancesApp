@@ -18,6 +18,9 @@ class PersonalFinancesApp
     private readonly IBudgetService _budgetService;
     private readonly ITransferManagementService _transferManagementService;
     private readonly ITransactionReprocessingService _reprocessingService;
+    private readonly ICsvImportOrchestrator _csvImportOrchestrator;
+    private readonly ICsvFileArchiveService _csvFileArchiveService;
+    private readonly ICsvFetchService _csvFetchService;
     private Dictionary<string, bool> _categoryTrackedOnlyCache = new();
 
     public PersonalFinancesApp(
@@ -32,7 +35,10 @@ class PersonalFinancesApp
         ICategoriesService categoriesService,
         IBudgetService budgetService,
         ITransferManagementService transferManagementService,
-        ITransactionReprocessingService reprocessingService
+        ITransactionReprocessingService reprocessingService,
+        ICsvImportOrchestrator csvImportOrchestrator,
+        ICsvFileArchiveService csvFileArchiveService,
+        ICsvFetchService csvFetchService
         )
     {
         _rbcCsvRepository = rbcCsvRepository;
@@ -47,6 +53,9 @@ class PersonalFinancesApp
         _budgetService = budgetService;
         _transferManagementService = transferManagementService;
         _reprocessingService = reprocessingService;
+        _csvImportOrchestrator = csvImportOrchestrator;
+        _csvFileArchiveService = csvFileArchiveService;
+        _csvFetchService = csvFetchService;
     }
 
     private async Task<string?> LoadLastUsedProfileAsync()
@@ -120,15 +129,13 @@ class PersonalFinancesApp
         }
     }
 
-    public async Task RunAsync(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString)
+    public async Task RunAsync(Dictionary<string, Type> transactionsDictionary, TransactionFilterService.TransactionRange? transactionFilterString, CsvImportSettings? csvImportSettings)
     {
         // load data from sources
         Console.WriteLine("CashFlow App Initialized\n");
 
         // Load category cache for tracked-only detection
         await LoadCategoriesAsync();
-
-        List<string> categories = _categoriesService.GetAllCategories();
 
         BudgetProfile? profile = null;
         bool createNewProfile = false;
@@ -236,6 +243,7 @@ class PersonalFinancesApp
         _transactionUserInteraction.ShowMessage($"\nBudget Total: ${budgetTotal.ToString("0.00")}");
 
         _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+        _transactionUserInteraction.ShowMessage("0. Fetch new transactions from banks");
         _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
         _transactionUserInteraction.ShowMessage("2. Edit profile");
         _transactionUserInteraction.ShowMessage("3. Category cleanup");
@@ -245,10 +253,48 @@ class PersonalFinancesApp
         string userInput = _transactionUserInteraction.GetInput().Trim();
 
         // Input validation
-        if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
+        if (!new[] { "0", "1", "2", "3", "4", "5", "" }.Contains(userInput))
         {
             _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
             userInput = "1";
+        }
+
+        // Handle option 0: Fetch transactions from banks
+        if (userInput == "0")
+        {
+            _transactionUserInteraction.ShowMessage("\n🌐 Fetching new transactions from RBC...");
+            var fetchResult = await _csvFetchService.FetchTransactionsForVendorAsync("RBC");
+
+            if (fetchResult.Success)
+            {
+                _transactionUserInteraction.ShowMessage($"✅ Success! Downloaded {fetchResult.FilesDownloaded} file(s) to Import/RBC");
+                if (!string.IsNullOrEmpty(fetchResult.DownloadedFilePath))
+                {
+                    _transactionUserInteraction.ShowMessage($"   File: {System.IO.Path.GetFileName(fetchResult.DownloadedFilePath)}\n");
+                }
+            }
+            else
+            {
+                _transactionUserInteraction.ShowMessage($"❌ Error: {fetchResult.ErrorMessage}\n");
+            }
+
+            // Return to menu
+            _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+            _transactionUserInteraction.ShowMessage("0. Fetch new transactions from banks");
+            _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
+            _transactionUserInteraction.ShowMessage("2. Edit profile");
+            _transactionUserInteraction.ShowMessage("3. Category cleanup");
+            _transactionUserInteraction.ShowMessage("4. Reprocess untyped transactions");
+            _transactionUserInteraction.ShowMessage("5. Quit\n");
+
+            userInput = _transactionUserInteraction.GetInput().Trim();
+
+            // Input validation
+            if (!new[] { "0", "1", "2", "3", "4", "5", "" }.Contains(userInput))
+            {
+                _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
+                userInput = "1";
+            }
         }
 
         // Prompt for transaction range if user chose to continue to transactions
@@ -283,6 +329,7 @@ class PersonalFinancesApp
 
                     // Ask again
                     _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+                    _transactionUserInteraction.ShowMessage("0. Fetch new transactions from banks");
                     _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
                     _transactionUserInteraction.ShowMessage("2. Edit profile");
                     _transactionUserInteraction.ShowMessage("3. Category cleanup");
@@ -292,7 +339,7 @@ class PersonalFinancesApp
                     userInput = _transactionUserInteraction.GetInput().Trim();
 
                     // Input validation
-                    if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
+                    if (!new[] { "0", "1", "2", "3", "4", "5", "" }.Contains(userInput))
                     {
                         _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
                         userInput = "1";
@@ -317,6 +364,7 @@ class PersonalFinancesApp
 
             // After cleanup, show menu again
             _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+            _transactionUserInteraction.ShowMessage("0. Fetch new transactions from banks");
             _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
             _transactionUserInteraction.ShowMessage("2. Edit profile");
             _transactionUserInteraction.ShowMessage("3. Category cleanup");
@@ -326,7 +374,7 @@ class PersonalFinancesApp
             userInput = _transactionUserInteraction.GetInput().Trim();
 
             // Input validation
-            if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
+            if (!new[] { "0", "1", "2", "3", "4", "5", "" }.Contains(userInput))
             {
                 _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
                 userInput = "1";
@@ -365,6 +413,7 @@ class PersonalFinancesApp
 
             // After reprocessing, show menu again
             _transactionUserInteraction.ShowMessage("\nWhat would you like to do?");
+            _transactionUserInteraction.ShowMessage("0. Fetch new transactions from banks");
             _transactionUserInteraction.ShowMessage("1. Continue to transactions (default)");
             _transactionUserInteraction.ShowMessage("2. Edit profile");
             _transactionUserInteraction.ShowMessage("3. Category cleanup");
@@ -374,7 +423,7 @@ class PersonalFinancesApp
             userInput = _transactionUserInteraction.GetInput().Trim();
 
             // Input validation
-            if (!new[] { "1", "2", "3", "4", "5", "" }.Contains(userInput))
+            if (!new[] { "0", "1", "2", "3", "4", "5", "" }.Contains(userInput))
             {
                 _transactionUserInteraction.ShowMessage($"Invalid choice '{userInput}'. Using default (1).\n");
                 userInput = "1";
@@ -391,36 +440,89 @@ class PersonalFinancesApp
             _transactionUserInteraction.Exit();
         }
 
-        // Get new transactions from CSV repository
-        Console.WriteLine("\n🔄 Loading transactions from CSV files...");
-        if (transactionsDictionary != null)
+        // Get transactions dictionary: prioritize hardcoded dict, then scan folders
+        Console.WriteLine("\n🔄 Determining transaction sources...");
+        var transactionsToProcess = await _csvImportOrchestrator.GetTransactionsToProcessAsync(
+            transactionsDictionary,
+            csvImportSettings,
+            _transactionUserInteraction);
+
+        if (transactionsToProcess == null || transactionsToProcess.Count == 0)
         {
-            foreach (var transactionEntry in transactionsDictionary)
+            Console.WriteLine("No transactions to process.\n");
+        }
+        else
+        {
+            Console.WriteLine("🔄 Loading transactions from CSV files...");
+
+            foreach (var transactionEntry in transactionsToProcess)
             {
                 if (string.IsNullOrEmpty(transactionEntry.Key))
                 {
                     continue; // Skip empty keys
                 }
-                else if (transactionEntry.Value == typeof(RBCTransaction))
+
+                try
                 {
-                    var transactions = await _rbcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                    await _rbcSqlRepository.SaveAsync(transactions);
+                    List<Transaction>? loadedTransactions = null;
+
+                    if (transactionEntry.Value == typeof(RBCTransaction))
+                    {
+                        var loadedRbcTransactions = await _rbcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                        await _rbcSqlRepository.SaveAsync(loadedRbcTransactions);
+                        loadedTransactions = loadedRbcTransactions.Cast<Transaction>().ToList();
+                        Console.WriteLine($"  ✓ Loaded {loadedTransactions.Count} RBC transactions from {Path.GetFileName(transactionEntry.Key)}");
+                    }
+                    else if (transactionEntry.Value == typeof(AmexTransaction))
+                    {
+                        var loadedAmexTransactions = await _amexCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                        await _amexSqlRepository.SaveAsync(loadedAmexTransactions);
+                        loadedTransactions = loadedAmexTransactions.Cast<Transaction>().ToList();
+                        Console.WriteLine($"  ✓ Loaded {loadedTransactions.Count} Amex transactions from {Path.GetFileName(transactionEntry.Key)}");
+                    }
+                    else if (transactionEntry.Value == typeof(PCFinancialTransaction))
+                    {
+                        var loadedPcTransactions = await _pcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
+                        await _pcSqlRepository.SaveAsync(loadedPcTransactions);
+                        loadedTransactions = loadedPcTransactions.Cast<Transaction>().ToList();
+                        Console.WriteLine($"  ✓ Loaded {loadedTransactions.Count} PC Financial transactions from {Path.GetFileName(transactionEntry.Key)}");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
+                    }
+
+                    // Archive file if successful and settings available
+                    if (loadedTransactions?.Count > 0 && csvImportSettings != null)
+                    {
+                        string? processedFolder = GetProcessedFolderForType(transactionEntry.Value, csvImportSettings);
+                        if (!string.IsNullOrEmpty(processedFolder))
+                        {
+                            bool archived = await _csvFileArchiveService.ArchiveFileAsync(
+                                transactionEntry.Key,
+                                processedFolder,
+                                loadedTransactions);
+
+                            if (archived)
+                            {
+                                Console.WriteLine($"  ✓ Archived: {Path.GetFileName(transactionEntry.Key)}");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"  ⚠ Failed to archive: {Path.GetFileName(transactionEntry.Key)} (file remains in input folder)");
+                            }
+                        }
+                    }
                 }
-                else if (transactionEntry.Value == typeof(AmexTransaction))
+                catch (Exception ex)
                 {
-                    var transactions = await _amexCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                    await _amexSqlRepository.SaveAsync(transactions);
-                }
-                else if (transactionEntry.Value == typeof(PCFinancialTransaction))
-                {
-                    var transactions = await _pcCsvRepository.LoadFromFileAsync(transactionEntry.Key);
-                    await _pcSqlRepository.SaveAsync(transactions);
-                }
-                else
-                {
-                    throw new InvalidOperationException($"Unsupported transaction type: {transactionEntry.Value}");
+                    Console.WriteLine($"  ✗ Error processing {Path.GetFileName(transactionEntry.Key)}: {ex.Message}");
+                    Console.WriteLine($"    File remains in input folder for inspection.\n");
+                    // Continue to next file instead of throwing
                 }
             }
+
+            Console.WriteLine();
         }
 
         // fetch all transactions
@@ -505,14 +607,15 @@ class PersonalFinancesApp
         Console.WriteLine("                    BUDGET CATEGORIES");
         Console.WriteLine("═══════════════════════════════════════════════════════════\n");
 
-        foreach (string category in categories)
+        // Loop through budget profile categories to ensure all budgeted categories get tables
+        foreach (string category in profile.BudgetCategories.Keys)
         {
             var categorizedTransactions = budgetedExpenses
                 .Where(transaction => string.Equals(transaction.Category, category, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(transaction => transaction.Date)
                 .ToList();
 
-            if (profile.BudgetCategories.Any(c => c.Key.ToLower() == category.ToLower()) && categorizedTransactions.Any())
+            if (categorizedTransactions.Any())
             {
                 _transactionUserInteraction.OutputTransactions(categorizedTransactions, category, profile);
             }
@@ -867,5 +970,16 @@ class PersonalFinancesApp
 
         // Display total
         Console.WriteLine($"Total Unbudgeted Spending: ${totalAmount:N2}\n");
+    }
+
+    private string? GetProcessedFolderForType(Type transactionType, CsvImportSettings settings)
+    {
+        if (transactionType == typeof(RBCTransaction))
+            return settings.RBC?.ProcessedFolder;
+        else if (transactionType == typeof(AmexTransaction))
+            return settings.Amex?.ProcessedFolder;
+        else if (transactionType == typeof(PCFinancialTransaction))
+            return settings.PCFinancial?.ProcessedFolder;
+        return null;
     }
 }

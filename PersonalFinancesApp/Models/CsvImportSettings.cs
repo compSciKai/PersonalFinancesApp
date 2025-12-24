@@ -11,4 +11,5 @@ public class CsvTransactionTypeSettings
 {
     public string? InputFolder { get; set; }
     public string? ProcessedFolder { get; set; }
+    public AutomatedFetchSettings? AutomatedFetch { get; set; }
 }
