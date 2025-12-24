@@ -9,15 +9,15 @@ using Microsoft.Extensions.Configuration;
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 // Transactions Paths
+
 //var transactionsDictionary = new Dictionary<string, Type>
 //{
 //    { @"", typeof(RBCTransaction) },
 //    { @"", typeof(AmexTransaction) }
 //};
 
-//Dictionary<string, Type> transactionsDictionary = null;
+Dictionary<string, Type> transactionsDictionary = null;
    
-
 TransactionFilterService.TransactionRange transactionRange = TransactionFilterService.TransactionRange.CurrentMonth;
 
 // Build configuration from appsettings.json
@@ -29,6 +29,10 @@ var configuration = new ConfigurationBuilder()
 // Load transfer management settings
 var transferSettings = new TransferManagementSettings();
 configuration.GetSection("TransferManagement").Bind(transferSettings);
+
+// Load CSV import settings
+var csvImportSettings = new CsvImportSettings();
+configuration.GetSection("CsvImport").Bind(csvImportSettings);
 
 // Initialize database context with configuration
 TransactionContext.Initialize(configuration);
@@ -193,6 +197,11 @@ if (args.Length > 0)
     }
 }
 
+// Initialize CSV import services
+var csvFileDiscoveryService = new CsvFileDiscoveryService();
+var csvFileArchiveService = new CsvFileArchiveService();
+var csvImportOrchestrator = new CsvImportOrchestrator(csvFileDiscoveryService);
+
 var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     new CsvTransactionRepository<RBCTransaction>(),
     new CsvTransactionRepository<AmexTransaction>(),
@@ -205,7 +214,9 @@ var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     categoriesService,
     budgetService,
     transferManagementService,
-    reprocessingService
+    reprocessingService,
+    csvImportOrchestrator,
+    csvFileArchiveService
 );
 
-await FinancesApp.RunAsync(transactionsDictionary, null);
+await FinancesApp.RunAsync(transactionsDictionary, transactionRange, csvImportSettings);
