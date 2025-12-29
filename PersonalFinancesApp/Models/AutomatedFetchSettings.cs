@@ -19,6 +19,12 @@ public class AutomatedFetchSettings
     /// Sequential automation steps to execute
     /// </summary>
     public List<AutomationStep>? Steps { get; set; }
+
+    /// <summary>
+    /// Whether to output verbose step-by-step progress logging
+    /// Defaults to true for backward compatibility
+    /// </summary>
+    public bool VerboseLogging { get; set; } = true;
 }
 
 /// <summary>

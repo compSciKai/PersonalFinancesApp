@@ -37,18 +37,43 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
             // Initialize Chrome with download folder configuration
             InitializeDriver(downloadFolderPath);
 
+            if (settings.VerboseLogging)
+            {
+                Console.WriteLine($"\n🤖 Starting automation: {settings.Steps.Count} steps");
+                Console.WriteLine($"📁 Download folder: {downloadFolderPath}\n");
+            }
+
             // Execute steps sequentially
+            int stepNumber = 0;
             foreach (var step in settings.Steps)
             {
+                stepNumber++;
+
+                if (settings.VerboseLogging)
+                {
+                    Console.WriteLine($"[{stepNumber}/{settings.Steps.Count}] ⏳ {GetStepDescription(step)}");
+                }
+
                 var result = await ExecuteStepAsync(step, downloadFolderPath);
                 if (!result.Success)
                 {
+                    // ALWAYS show errors regardless of VerboseLogging
+                    Console.WriteLine($"[{stepNumber}/{settings.Steps.Count}] ❌ FAILED");
+
+                    // Capture screenshot on failure
+                    CaptureFailureScreenshot(stepNumber);
+
                     // Keep browser open for inspection on error
                     Console.WriteLine("\n⚠️  Browser window left open for inspection.");
                     Console.WriteLine("    Press Enter when you're done inspecting, and the browser will close...");
                     Console.ReadLine();
                     Cleanup();
                     return result;
+                }
+
+                if (settings.VerboseLogging)
+                {
+                    Console.WriteLine($"[{stepNumber}/{settings.Steps.Count}] ✅ Success");
                 }
 
                 // If step was WaitForDownload, collect the downloaded file path
@@ -60,6 +85,13 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
 
             // Success - cleanup and return all downloaded files
             Cleanup();
+
+            if (settings.VerboseLogging)
+            {
+                Console.WriteLine($"\n✅ Automation completed successfully!");
+                Console.WriteLine($"📥 Downloaded {downloadedFiles.Count} file(s)");
+            }
+
             return new BrowserAutomationResult
             {
                 Success = true,
@@ -160,26 +192,42 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
         }
         catch (WebDriverTimeoutException ex)
         {
+            var currentUrl = _driver?.Url ?? "unknown";
+
             return new BrowserAutomationResult
             {
                 Success = false,
-                ErrorMessage = $"Timeout during {step.Type} step: {ex.Message}"
+                ErrorMessage = $"Timeout during {step.Type} step ({step.TimeoutSeconds}s)\n" +
+                              $"  Selector: {step.Selector} ({step.SelectorType})\n" +
+                              $"  Current URL: {currentUrl}\n" +
+                              $"  Details: {ex.Message}"
             };
         }
         catch (NoSuchElementException ex)
         {
+            var currentUrl = _driver?.Url ?? "unknown";
+            var pageTitle = _driver?.Title ?? "unknown";
+
             return new BrowserAutomationResult
             {
                 Success = false,
-                ErrorMessage = $"Element not found during {step.Type} step: {ex.Message}"
+                ErrorMessage = $"Element not found during {step.Type} step\n" +
+                              $"  Selector: {step.Selector} ({step.SelectorType})\n" +
+                              $"  Current URL: {currentUrl}\n" +
+                              $"  Page Title: {pageTitle}\n" +
+                              $"  Details: {ex.Message}"
             };
         }
         catch (Exception ex)
         {
+            var currentUrl = _driver?.Url ?? "unknown";
+
             return new BrowserAutomationResult
             {
                 Success = false,
-                ErrorMessage = $"Error during {step.Type} step: {ex.Message}"
+                ErrorMessage = $"Error during {step.Type} step\n" +
+                              $"  Current URL: {currentUrl}\n" +
+                              $"  Details: {ex.Message}"
             };
         }
     }
@@ -405,7 +453,7 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
         {
             "LinkText" => By.LinkText(step.Selector!),
             "PartialLinkText" => By.PartialLinkText(step.Selector!),
-            "ButtonText" => By.XPath($"//button[text()='{step.Selector}']"),
+            "ButtonText" => By.XPath($"//button[contains(., '{step.Selector}')]"),  // Use contains() to match nested text
             "CssSelector" => By.CssSelector(step.Selector!),
             "XPath" => By.XPath(step.Selector!),
             "Id" => By.Id(step.Selector!),
@@ -413,6 +461,71 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
             "ClassName" => By.ClassName(step.Selector!),
             _ => throw new ArgumentException($"Unknown selector type: {step.SelectorType}")
         };
+    }
+
+    /// <summary>
+    /// Attempts to find element by data-testid, falling back to data-test-id if not found.
+    /// Handles inconsistent attribute naming across different web applications.
+    /// </summary>
+    private IWebElement FindElementByTestId(string testId, int timeoutSeconds)
+    {
+        var wait = new WebDriverWait(_driver!, TimeSpan.FromSeconds(timeoutSeconds));
+
+        try
+        {
+            // Try data-testid first (React Testing Library standard)
+            return wait.Until(d => d.FindElement(By.CssSelector($"[data-testid='{testId}']")));
+        }
+        catch (WebDriverTimeoutException)
+        {
+            // Fallback to data-test-id (legacy/custom implementations)
+            return wait.Until(d => d.FindElement(By.CssSelector($"[data-test-id='{testId}']")));
+        }
+    }
+
+    /// <summary>
+    /// Gets a human-readable description of an automation step for logging.
+    /// </summary>
+    private string GetStepDescription(AutomationStep step)
+    {
+        return step.Type switch
+        {
+            "Navigate" => $"Navigate to {step.Url}",
+            "Click" => $"Click {step.Selector}",
+            "ClickLabel" => $"Click label: {step.Selector}",
+            "CheckCheckbox" => $"Check checkbox: {step.Selector}",
+            "WaitForUserAuth" => "Wait for user authentication",
+            "WaitForUrl" => $"Wait for URL: {step.Url}",
+            "WaitForElement" => $"Wait for element: {step.Selector}",
+            "WaitForDownload" => "Wait for download to complete",
+            _ => $"{step.Type} step"
+        };
+    }
+
+    /// <summary>
+    /// Captures a screenshot on automation failure for debugging.
+    /// Screenshot is saved to automation-logs/ directory.
+    /// </summary>
+    private void CaptureFailureScreenshot(int stepNumber)
+    {
+        try
+        {
+            var logsFolder = Path.Combine(Directory.GetCurrentDirectory(), "automation-logs");
+            Directory.CreateDirectory(logsFolder);
+
+            var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var filename = $"{timestamp}-step-{stepNumber}-failure.png";
+            var filepath = Path.Combine(logsFolder, filename);
+
+            var screenshot = ((ITakesScreenshot)_driver!).GetScreenshot();
+            screenshot.SaveAsFile(filepath);
+
+            Console.WriteLine($"📸 Screenshot saved: {filepath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️  Failed to capture screenshot: {ex.Message}");
+        }
     }
 
     private void Cleanup()
