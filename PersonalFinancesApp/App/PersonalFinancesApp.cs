@@ -262,20 +262,87 @@ class PersonalFinancesApp
         // Handle option 0: Fetch transactions from banks
         if (userInput == "0")
         {
-            _transactionUserInteraction.ShowMessage("\n🌐 Fetching new transactions from RBC...");
-            var fetchResult = await _csvFetchService.FetchTransactionsForVendorAsync("RBC");
+            // Get list of enabled vendors
+            var enabledVendors = new List<(string Name, string DisplayName)>();
 
-            if (fetchResult.Success)
+            if (csvImportSettings?.RBC?.AutomatedFetch?.Enabled == true)
+                enabledVendors.Add(("RBC", "RBC"));
+            if (csvImportSettings?.Amex?.AutomatedFetch?.Enabled == true)
+                enabledVendors.Add(("AMEX", "American Express"));
+            if (csvImportSettings?.PCFinancial?.AutomatedFetch?.Enabled == true)
+                enabledVendors.Add(("PCFINANCIAL", "PC Financial"));
+
+            if (!enabledVendors.Any())
             {
-                _transactionUserInteraction.ShowMessage($"✅ Success! Downloaded {fetchResult.FilesDownloaded} file(s) to Import/RBC");
-                if (!string.IsNullOrEmpty(fetchResult.DownloadedFilePath))
+                _transactionUserInteraction.ShowMessage("❌ No vendors have automated fetching enabled in appsettings.json\n");
+            }
+            else if (enabledVendors.Count == 1)
+            {
+                // Only one vendor enabled, fetch directly
+                var vendor = enabledVendors[0];
+                _transactionUserInteraction.ShowMessage($"\n🌐 Fetching new transactions from {vendor.DisplayName}...");
+                var fetchResult = await _csvFetchService.FetchTransactionsForVendorAsync(vendor.Name);
+
+                if (fetchResult.Success)
                 {
-                    _transactionUserInteraction.ShowMessage($"   File: {System.IO.Path.GetFileName(fetchResult.DownloadedFilePath)}\n");
+                    _transactionUserInteraction.ShowMessage($"✅ Success! Downloaded {fetchResult.FilesDownloaded} file(s)");
+                    if (!string.IsNullOrEmpty(fetchResult.DownloadedFilePath))
+                    {
+                        _transactionUserInteraction.ShowMessage($"   File: {System.IO.Path.GetFileName(fetchResult.DownloadedFilePath)}\n");
+                    }
+                }
+                else
+                {
+                    _transactionUserInteraction.ShowMessage($"❌ Error: {fetchResult.ErrorMessage}\n");
                 }
             }
             else
             {
-                _transactionUserInteraction.ShowMessage($"❌ Error: {fetchResult.ErrorMessage}\n");
+                // Multiple vendors enabled, show selection menu
+                _transactionUserInteraction.ShowMessage("\n📋 Select vendor to fetch from:");
+                _transactionUserInteraction.ShowMessage("0. All enabled vendors");
+                for (int i = 0; i < enabledVendors.Count; i++)
+                {
+                    _transactionUserInteraction.ShowMessage($"{i + 1}. {enabledVendors[i].DisplayName}");
+                }
+                _transactionUserInteraction.ShowMessage("");
+
+                var vendorChoice = _transactionUserInteraction.GetInput().Trim();
+
+                List<(string Name, string DisplayName)> vendorsToFetch;
+                if (vendorChoice == "0")
+                {
+                    vendorsToFetch = enabledVendors;
+                }
+                else if (int.TryParse(vendorChoice, out int choice) && choice >= 1 && choice <= enabledVendors.Count)
+                {
+                    vendorsToFetch = new List<(string, string)> { enabledVendors[choice - 1] };
+                }
+                else
+                {
+                    _transactionUserInteraction.ShowMessage($"Invalid choice '{vendorChoice}'. Skipping fetch.\n");
+                    vendorsToFetch = new List<(string, string)>();
+                }
+
+                // Fetch from selected vendor(s)
+                foreach (var vendor in vendorsToFetch)
+                {
+                    _transactionUserInteraction.ShowMessage($"\n🌐 Fetching new transactions from {vendor.DisplayName}...");
+                    var fetchResult = await _csvFetchService.FetchTransactionsForVendorAsync(vendor.Name);
+
+                    if (fetchResult.Success)
+                    {
+                        _transactionUserInteraction.ShowMessage($"✅ Success! Downloaded {fetchResult.FilesDownloaded} file(s)");
+                        if (!string.IsNullOrEmpty(fetchResult.DownloadedFilePath))
+                        {
+                            _transactionUserInteraction.ShowMessage($"   File: {System.IO.Path.GetFileName(fetchResult.DownloadedFilePath)}\n");
+                        }
+                    }
+                    else
+                    {
+                        _transactionUserInteraction.ShowMessage($"❌ Error: {fetchResult.ErrorMessage}\n");
+                    }
+                }
             }
 
             // Return to menu

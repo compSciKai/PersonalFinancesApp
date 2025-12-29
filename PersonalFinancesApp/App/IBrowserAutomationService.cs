@@ -25,5 +25,9 @@ public class BrowserAutomationResult
 {
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
-    public string? DownloadedFilePath { get; set; }
+
+    /// <summary>
+    /// List of all files downloaded during the automation session
+    /// </summary>
+    public List<string> DownloadedFilePaths { get; set; } = new List<string>();
 }

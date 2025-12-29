@@ -30,6 +30,8 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
             };
         }
 
+        var downloadedFiles = new List<string>();
+
         try
         {
             // Initialize Chrome with download folder configuration
@@ -49,20 +51,20 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
                     return result;
                 }
 
-                // If step was WaitForDownload, return the downloaded file path
-                if (step.Type == "WaitForDownload" && !string.IsNullOrEmpty(result.DownloadedFilePath))
+                // If step was WaitForDownload, collect the downloaded file path
+                if (step.Type == "WaitForDownload" && result.DownloadedFilePaths.Any())
                 {
-                    Cleanup();
-                    return result;
+                    downloadedFiles.AddRange(result.DownloadedFilePaths);
                 }
             }
 
-            // Success - cleanup and return
+            // Success - cleanup and return all downloaded files
             Cleanup();
             return new BrowserAutomationResult
             {
                 Success = true,
-                ErrorMessage = null
+                ErrorMessage = null,
+                DownloadedFilePaths = downloadedFiles
             };
         }
         catch (Exception ex)
@@ -90,11 +92,23 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
         options.AddUserProfilePreference("download.directory_upgrade", true);
         options.AddUserProfilePreference("safebrowsing.enabled", true);
 
+        // Anti-bot detection: Make Chrome appear like a normal browser
+        options.AddExcludedArgument("enable-automation");  // Remove "Chrome is being controlled" banner
+        options.AddArgument("--disable-blink-features=AutomationControlled");  // Hide automation flag
+        options.AddAdditionalOption("useAutomationExtension", false);  // Disable automation extension
+
+        // Additional flags to appear more like a real browser
+        options.AddArgument("--disable-infobars");  // Remove info bars
+        options.AddArgument("--start-maximized");  // Start maximized like normal usage
+
         // Keep browser visible for user authentication
         // options.AddArgument("--headless"); // NOT using headless mode
 
         _driver = new ChromeDriver(options);
         _driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
+
+        // Execute JavaScript to remove navigator.webdriver flag (strongest detection method)
+        ((IJavaScriptExecutor)_driver).ExecuteScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
     }
 
     private async Task<BrowserAutomationResult> ExecuteStepAsync(AutomationStep step, string downloadFolderPath)
@@ -123,6 +137,12 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
 
                 case "Click":
                     return ExecuteClick(step);
+
+                case "ClickLabel":
+                    return ExecuteClickLabel(step);
+
+                case "CheckCheckbox":
+                    return ExecuteCheckCheckbox(step);
 
                 case "WaitForElement":
                     return ExecuteWaitForElement(step);
@@ -225,6 +245,84 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
         return new BrowserAutomationResult { Success = true };
     }
 
+    private BrowserAutomationResult ExecuteClickLabel(AutomationStep step)
+    {
+        if (string.IsNullOrEmpty(step.Selector))
+        {
+            return new BrowserAutomationResult
+            {
+                Success = false,
+                ErrorMessage = "ClickLabel step requires Selector"
+            };
+        }
+
+        // For clicking label text (used when clicking radio/checkbox inputs is intercepted)
+        // Selector should be the label text content
+        var by = By.XPath($"//label[contains(text(), '{step.Selector}')] | //div[text()='{step.Selector}']");
+        var wait = new WebDriverWait(_driver!, TimeSpan.FromSeconds(step.TimeoutSeconds));
+        var element = wait.Until(d => d.FindElement(by));
+        element.Click();
+
+        // Small delay after click
+        Thread.Sleep(500);
+
+        return new BrowserAutomationResult { Success = true };
+    }
+
+    private BrowserAutomationResult ExecuteCheckCheckbox(AutomationStep step)
+    {
+        if (string.IsNullOrEmpty(step.Selector))
+        {
+            return new BrowserAutomationResult
+            {
+                Success = false,
+                ErrorMessage = "CheckCheckbox step requires Selector"
+            };
+        }
+
+        // Find the checkbox label by text
+        var labelBy = By.XPath($"//label[contains(text(), '{step.Selector}')]");
+        var wait = new WebDriverWait(_driver!, TimeSpan.FromSeconds(step.TimeoutSeconds));
+        var label = wait.Until(d => d.FindElement(labelBy));
+
+        // Find associated checkbox input (typically via 'for' attribute or parent/sibling relationship)
+        IWebElement? checkbox = null;
+        try
+        {
+            // Try to find checkbox via label's 'for' attribute
+            var forAttr = label.GetAttribute("for");
+            if (!string.IsNullOrEmpty(forAttr))
+            {
+                checkbox = _driver!.FindElement(By.Id(forAttr));
+            }
+        }
+        catch
+        {
+            // If not found, try to find checkbox as sibling or child
+            try
+            {
+                checkbox = label.FindElement(By.XPath(".//input[@type='checkbox'] | ./preceding-sibling::input[@type='checkbox'] | ./following-sibling::input[@type='checkbox']"));
+            }
+            catch
+            {
+                // Fallback: just click the label regardless of current state
+                label.Click();
+                Thread.Sleep(500);
+                return new BrowserAutomationResult { Success = true };
+            }
+        }
+
+        // Check if checkbox is already checked
+        if (checkbox != null && !checkbox.Selected)
+        {
+            // Click the label to check it
+            label.Click();
+            Thread.Sleep(500);
+        }
+
+        return new BrowserAutomationResult { Success = true };
+    }
+
     private BrowserAutomationResult ExecuteWaitForElement(AutomationStep step)
     {
         if (string.IsNullOrEmpty(step.Selector))
@@ -282,7 +380,7 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
                 return new BrowserAutomationResult
                 {
                     Success = true,
-                    DownloadedFilePath = candidateFiles.First()
+                    DownloadedFilePaths = new List<string> { candidateFiles.First() }
                 };
             }
         }

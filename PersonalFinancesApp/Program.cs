@@ -202,6 +202,10 @@ var csvFileDiscoveryService = new CsvFileDiscoveryService();
 var csvFileArchiveService = new CsvFileArchiveService();
 var csvImportOrchestrator = new CsvImportOrchestrator(csvFileDiscoveryService);
 
+// Initialize CSV fetch automation services
+var browserAutomationService = new BrowserAutomationService();
+var csvFetchService = new CsvFetchService(browserAutomationService, csvImportSettings);
+
 var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     new CsvTransactionRepository<RBCTransaction>(),
     new CsvTransactionRepository<AmexTransaction>(),
@@ -216,7 +220,8 @@ var FinancesApp = new PersonalFinances.App.PersonalFinancesApp(
     transferManagementService,
     reprocessingService,
     csvImportOrchestrator,
-    csvFileArchiveService
+    csvFileArchiveService,
+    csvFetchService
 );
 
 await FinancesApp.RunAsync(transactionsDictionary, transactionRange, csvImportSettings);

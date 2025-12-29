@@ -70,11 +70,14 @@ public class CsvFetchService : ICsvFetchService
 
             if (result.Success)
             {
+                // Rename downloaded files with vendor-specific names and timestamps
+                var renamedFiles = RenameDownloadedFiles(vendorName, inputFolder, result.DownloadedFilePaths);
+
                 return new CsvFetchResult
                 {
                     Success = true,
-                    FilesDownloaded = string.IsNullOrEmpty(result.DownloadedFilePath) ? 0 : 1,
-                    DownloadedFilePath = result.DownloadedFilePath
+                    FilesDownloaded = renamedFiles.Count,
+                    DownloadedFilePath = renamedFiles.FirstOrDefault()
                 };
             }
             else
@@ -94,6 +97,65 @@ public class CsvFetchService : ICsvFetchService
                 ErrorMessage = $"Error fetching transactions for {vendorName}: {ex.Message}"
             };
         }
+    }
+
+    private List<string> RenameDownloadedFiles(string vendorName, string inputFolder, List<string> downloadedFilePaths)
+    {
+        var renamedFiles = new List<string>();
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+        for (int i = 0; i < downloadedFilePaths.Count; i++)
+        {
+            var originalPath = downloadedFilePaths[i];
+            if (!File.Exists(originalPath))
+            {
+                Console.WriteLine($"⚠️  Warning: Downloaded file not found: {originalPath}");
+                continue;
+            }
+
+            string newFileName;
+            var originalFileName = Path.GetFileName(originalPath);
+
+            // Generate vendor-specific filename
+            if (vendorName.ToUpperInvariant() == "AMEX")
+            {
+                // For Amex, distinguish between latest transactions and recent statement
+                if (i == 0)
+                {
+                    newFileName = $"amex_latest_transactions_{timestamp}.csv";
+                }
+                else if (i == 1)
+                {
+                    newFileName = $"amex_recent_statement_{timestamp}.csv";
+                }
+                else
+                {
+                    newFileName = $"amex_download_{i + 1}_{timestamp}.csv";
+                }
+            }
+            else
+            {
+                // For other vendors, use simple naming with counter if multiple files
+                var fileCounter = downloadedFilePaths.Count > 1 ? $"_{i + 1}" : "";
+                newFileName = $"{vendorName.ToLower()}_transactions{fileCounter}_{timestamp}.csv";
+            }
+
+            var newPath = Path.Combine(inputFolder, newFileName);
+
+            try
+            {
+                File.Move(originalPath, newPath);
+                renamedFiles.Add(newPath);
+                Console.WriteLine($"✅ Renamed: {originalFileName} → {newFileName}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️  Warning: Failed to rename {originalFileName}: {ex.Message}");
+                renamedFiles.Add(originalPath); // Keep original path if rename fails
+            }
+        }
+
+        return renamedFiles;
     }
 
     private CsvTransactionTypeSettings? GetVendorSettings(string vendorName)
