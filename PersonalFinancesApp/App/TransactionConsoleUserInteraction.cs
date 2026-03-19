@@ -317,7 +317,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                 transactionType = TransactionType.Income;
                 ShowMessage($"\nApply 'Income' type to all future transactions from '{vendor}'? (y/n): ");
                 string applyResponse = GetInput().Trim().ToLower();
-                applyTypeToAll = applyResponse == "y" || applyResponse == "yes" || applyResponse == "";
+                applyTypeToAll = applyResponse == "y" || applyResponse == "yes";
                 return (null, false, false, transactionType, applyTypeToAll);
             }
 
@@ -326,7 +326,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                 transactionType = TransactionType.Transfer;
                 ShowMessage($"\nApply 'Transfer' type to all future transactions from '{vendor}'? (y/n): ");
                 string applyResponse = GetInput().Trim().ToLower();
-                applyTypeToAll = applyResponse == "y" || applyResponse == "yes" || applyResponse == "";
+                applyTypeToAll = applyResponse == "y" || applyResponse == "yes";
                 return (null, false, false, transactionType, applyTypeToAll);
             }
 
@@ -335,7 +335,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
                 transactionType = TransactionType.Adjustment;
                 ShowMessage($"\nApply 'Adjustment' type to all future transactions from '{vendor}'? (y/n): ");
                 string applyResponse = GetInput().Trim().ToLower();
-                applyTypeToAll = applyResponse == "y" || applyResponse == "yes" || applyResponse == "";
+                applyTypeToAll = applyResponse == "y" || applyResponse == "yes";
                 return (null, false, false, transactionType, applyTypeToAll);
             }
 
@@ -454,8 +454,8 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
             string categoryDisplay = budgetCategory.Key;
             string categoryKey = budgetCategory.Key.ToLower();
             decimal budgeted = (decimal)budgetCategory.Value;
-            decimal actual = actualAmounts.ContainsKey(categoryKey) ? actualAmounts[categoryKey] : 0;
-            decimal difference = budgeted + actual; // actual in negative figure
+            decimal actual = actualAmounts.ContainsKey(categoryKey) ? Math.Abs(actualAmounts[categoryKey]) : 0;
+            decimal difference = budgeted - actual;
 
             DataRow row = finalTable.NewRow();
             row["Category"] = categoryDisplay;
@@ -472,7 +472,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         decimal totalActual = finalTable.AsEnumerable()
             .Sum(row => (decimal)row["Actual"]);
 
-        decimal totalDifference = totalBudgeted + totalActual;
+        decimal totalDifference = totalBudgeted - totalActual;
 
         // Add TOTAL row
         DataRow totalRow = finalTable.NewRow();
@@ -491,7 +491,7 @@ public class TransactionsConsoleUserInteraction : ITransactionsUserInteraction
         finalTable.Rows.Add(dividerRow);
 
         // Calculate performance metrics
-        decimal budgetUsedPercent = totalBudgeted != 0 ? (Math.Abs(totalActual) / totalBudgeted) * 100 : 0;
+        decimal budgetUsedPercent = totalBudgeted != 0 ? (totalActual / totalBudgeted) * 100 : 0;
         decimal variancePercent = totalBudgeted != 0 ? (totalDifference / totalBudgeted) * 100 : 0;
 
         // Count categories under budget (where difference > 0)

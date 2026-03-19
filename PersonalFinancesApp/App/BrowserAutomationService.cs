@@ -58,7 +58,7 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
                 if (!result.Success)
                 {
                     // ALWAYS show errors regardless of VerboseLogging
-                    Console.WriteLine($"[{stepNumber}/{settings.Steps.Count}] ❌ FAILED");
+                    Console.WriteLine($"[{stepNumber}/{settings.Steps.Count}] ❌ FAILED: {result.ErrorMessage}");
 
                     // Capture screenshot on failure
                     CaptureFailureScreenshot(stepNumber);
@@ -101,10 +101,20 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
         }
         catch (Exception ex)
         {
-            // Keep browser open for inspection on unexpected errors
-            Console.WriteLine("\n⚠️  Unexpected error occurred. Browser window left open for inspection.");
-            Console.WriteLine("    Press Enter when you're done inspecting, and the browser will close...");
-            Console.ReadLine();
+            Console.WriteLine($"\n⚠️  Unexpected error: {ex.Message}");
+
+            if (_driver != null)
+            {
+                // Browser is open - keep it for inspection
+                Console.WriteLine("    Browser window left open for inspection.");
+                Console.WriteLine("    Press Enter when you're done inspecting, and the browser will close...");
+                Console.ReadLine();
+            }
+            else
+            {
+                Console.WriteLine("    Browser failed to start. Check that ChromeDriver is installed and matches your Chrome version.");
+            }
+
             Cleanup();
             return new BrowserAutomationResult
             {
@@ -132,6 +142,14 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
         // Additional flags to appear more like a real browser
         options.AddArgument("--disable-infobars");  // Remove info bars
         options.AddArgument("--start-maximized");  // Start maximized like normal usage
+        options.AddArgument("--disable-dev-shm-usage");  // Overcome limited resource problems
+        options.AddArgument("--no-sandbox");  // Bypass OS security model
+        options.AddArgument("--disable-gpu");  // Disable GPU hardware acceleration
+
+        // Enhanced anti-detection for stricter banking sites
+        options.AddArgument("--disable-extensions");  // Disable all extensions
+        options.AddArgument("--disable-plugins-discovery");  // Disable plugin discovery
+        options.AddArgument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36");  // Set realistic user agent
 
         // Keep browser visible for user authentication
         // options.AddArgument("--headless"); // NOT using headless mode
@@ -139,8 +157,34 @@ public class BrowserAutomationService : IBrowserAutomationService, IDisposable
         _driver = new ChromeDriver(options);
         _driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
 
-        // Execute JavaScript to remove navigator.webdriver flag (strongest detection method)
-        ((IJavaScriptExecutor)_driver).ExecuteScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+        // Execute JavaScript to remove navigator.webdriver flag and other automation signatures
+        var js = (IJavaScriptExecutor)_driver;
+
+        // Override navigator.webdriver (primary detection method)
+        js.ExecuteScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+
+        // Override chrome.runtime to hide automation
+        js.ExecuteScript("window.navigator.chrome = { runtime: {} };");
+
+        // Override permissions API to avoid detection
+        js.ExecuteScript(@"
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+        ");
+
+        // Override plugin array to appear like normal Chrome
+        js.ExecuteScript(@"
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+        ");
+
+        // Override languages to appear more realistic
+        js.ExecuteScript("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});");
     }
 
     private async Task<BrowserAutomationResult> ExecuteStepAsync(AutomationStep step, string downloadFolderPath)

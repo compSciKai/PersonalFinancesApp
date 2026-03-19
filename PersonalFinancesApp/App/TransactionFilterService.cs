@@ -54,24 +54,14 @@ public static class TransactionFilterService
 
     private static DateTime FirstDayOfThreeMonthsAgo()
     {
-        int monthsBack = 3;
-        DateTime now = DateTime.Now;
-        int targetMonth = now.Month - monthsBack;
-        int targetYear = now.Year;
-
-        // Handle year boundary
-        if (targetMonth <= 0)
-        {
-            targetMonth += 12;
-            targetYear -= 1;
-        }
-
-        return new DateTime(targetYear, targetMonth, 1, 0, 0, 0);
+        DateTime firstDayOfThisMonth = FirstDayOfThisMonth();
+        return firstDayOfThisMonth.AddMonths(-3);
     }
 
     private static DateTime FirstDayOfLastMonth()
     {
-        return new DateTime(DateTime.Now.Year, DateTime.Now.Month - 1, 1, 0, 0, 0);
+        DateTime firstDayOfThisMonth = FirstDayOfThisMonth();
+        return firstDayOfThisMonth.AddMonths(-1);
     }
 
     public enum TransactionRange
